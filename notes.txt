@@ -1,0 +1,35 @@
+The input is an m-by-n matrix A. We are to compute a p-truncated SVD of A. We make the following
+hard assumptions and definitions for ease of exposition and programming:
+
+    * (assumption) m >= n.
+    * (assumption) m and n are both powers of 2.
+    * (assumption) 2^q compute nodes, with q >= 1.
+    * (assumption) n >= 2^q.
+    * (definition) b = 2^q. (number of nodes)
+    * (definition) s = n/b. (number of columns per initial submatrix)
+    * (definition) p is number of singular values/vectors we are computing (approximately)
+    * (assumtpion) s >= p >= 1.
+
+Ai := A(0..m-1, i*s..(i+1)*s-1), i := 0..b-1
+
+
+Example
+=======
+
+parameters: m=256, n=128, q=3, p=10;
+variables:  b:=8, s:=16
+
+A0 = A(0..255,   0...15)
+A1 = A(0..255,  16...31)
+A2 = A(0..255,  32...47)
+A3 = A(0..255,  48...63)
+A4 = A(0..255,  64...79)
+A5 = A(0..255,  80...95)
+A6 = A(0..255,  96..111)
+A7 = A(0..255, 112..127)
+
+
+Algorithm SeedNode(i):
+
+    Input: Ai = A(0..m-1, i*s..(i+1)*s-1) // 0 <= i < b
+    Output: A1_lj, V1_lj
