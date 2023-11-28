@@ -45,11 +45,25 @@ def combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, m, n, i, k, q, p):
     Vhtki1 = np.concatenate((Vtk_2i_0, np.zeros(Vtk_2i_0.shape)), axis=1)
     Vhtki2 = np.concatenate((np.zeros(Vtk_2i_1.shape), Vtk_2i_1), axis=1)
     Vhtki = np.concatenate((Vhtki1, Vhtki2), axis=0)
+    mmwrite("Aki_c.mtx", Aki)
+    mmwrite("Vhtki_c.mtx", Vhtki)
+
     Uki, Ski, Vtki = svds(Aki, p)
+    mmwrite("USki_c.mtx", Uki@np.diag(Ski))
+    mmwrite("Vtki_c.mtx", Vtki)
+
     W = (Vtki@Vhtki).T
+    mmwrite("W_c.mtx", W)
+
     Qki, Rki = np.linalg.qr(W)
+    mmwrite("Qki_c.mtx", Qki)
+    mmwrite("Rki_c.mtx", Rki)
+    mmwrite("Rki_inv_c.mtx", np.linalg.inv(Rki))
+
     Ak1_lj = Uki@np.diag(Ski)@np.linalg.inv(Rki)
+
     Vtk1_lj = Qki.T
+
     return Ak1_lj, Vtk1_lj
 
 def _create_example(m, n, r, p, q, cond, damp):

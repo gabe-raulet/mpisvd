@@ -7,6 +7,7 @@
 #include "lapacke.h"
 #include "svd_routines.h"
 #include "linalg_routines.h"
+#include "mmio_dense.h"
 
 int naive_transpose(double *At, const double *A, int m, int n)
 {
@@ -61,6 +62,8 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
     memcpy(&Aki[0],   Ak_2i_0, m*p*sizeof(double));
     memcpy(&Aki[m*p], Ak_2i_1, m*p*sizeof(double));
 
+    mmwrite("Aki_a.mtx", Aki, m, 2*p);
+
     double *Vhtki = calloc((2*p)*(2*d), sizeof(double));
 
     for (int j = 0; j < d; ++j)
@@ -69,6 +72,7 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
         memcpy(&Vhtki[(j+d)*(2*p)+p], &Vtk_2i_1[j*p], p*sizeof(double));
     }
 
+    mmwrite("Vhtki_a.mtx", Vhtki, 2*p, 2*d);
 
     double *Uki = malloc(m*p*sizeof(double));
     double *Ski = malloc(p*sizeof(double));
@@ -87,6 +91,9 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
             USki[i + j*m] *= Ski[j];
 
     free(Ski);
+
+    mmwrite("USki_a.mtx", USki, m, p);
+    mmwrite("Vtki_a.mtx", Vtki, p, 2*p);
 
     /*
      * Compute W = Tr(Vhtki)*Tr(Vtki).
@@ -117,23 +124,10 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
                   2*d  /* leading dimension of W */
     );
 
-    /*for (int i = 0; i < 2*d; ++i)*/
-        /*for (int j = 0; j < p; ++j)*/
-        /*{*/
-            /*double acc = 0;*/
-            /*for (int l = 0; l < 2*p; ++l)*/
-            /*{*/
-                /*double vil = Vhtki[l + i*2*p]; [> Tr(Vhtki)[i,l] = Vhtki[l,i] <]*/
-                /*double vlj = Vtki[j + l*p]; [> Tr(Vtki)[l,j] = Vtki[j,l] <]*/
-
-                /*acc += vil*vlj;*/
-            /*}*/
-
-            /*W[i + j*2*d] = acc;*/
-        /*}*/
-
     free(Vtki);
     free(Vhtki);
+
+    mmwrite("W_a.mtx", W, 2*d, p);
 
     /*
      * Compute QR-factorization W = Qki*Rki.

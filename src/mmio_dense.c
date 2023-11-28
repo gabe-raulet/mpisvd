@@ -67,3 +67,26 @@ int mmio_write_dense(FILE *f, double const *A, int m, int n, int row_major)
 
     return 0;
 }
+
+double* mmread(char const *fname, int *m, int *n)
+{
+    double *A;
+    FILE *f;
+
+    f = fopen(fname, "r");
+    mmio_read_dense(f, &A, m, n, 0);
+    fclose(f);
+
+    return A;
+}
+
+int mmwrite(char const *fname, double const *A, int m, int n)
+{
+    FILE *f;
+
+    f = fopen(fname, "w");
+    mmio_write_dense(f, A, m, n, 0);
+    fclose(f);
+
+    return 0;
+}
