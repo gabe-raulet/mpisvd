@@ -293,7 +293,7 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
     cblas_dgemm
     (
         CblasColMajor, /* all matrices stored column-major */
-           CblasTrans, /* transpose A */
+         CblasNoTrans, /* don't transpose A */
            CblasTrans, /* transpose B */
                     p, /* number of rows of C */
                     p, /* number of columns of C */
