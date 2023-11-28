@@ -6,7 +6,6 @@
 #include "cblas.h"
 #include "lapacke.h"
 #include "svd_routines.h"
-#include "linalg_routines.h"
 #include "mmio_dense.h"
 
 int svds_naive(const double *A, double *Up, double *Sp, double *Vpt, int m, int n, int p)
@@ -37,8 +36,6 @@ int svds_naive(const double *A, double *Up, double *Sp, double *Vpt, int m, int 
         drank,
         work
     );
-
-    /*serial_thin_svd_lapack((double *)A, &S, &U, &Vt, m, n);*/
 
     memcpy(Up, U, p*m*sizeof(double));
     memcpy(Sp, S, p*sizeof(double));

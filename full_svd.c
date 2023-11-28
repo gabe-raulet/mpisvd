@@ -7,7 +7,6 @@
 #include "cblas.h"
 #include "lapacke.h"
 #include "mmio_dense.h"
-#include "linalg_routines.h"
 #include "svd_routines.h"
 
 int iseed[4];
@@ -90,11 +89,6 @@ int main(int argc, char *argv[])
     Aq1_12 = &Acat[m*p];
     Vtq1_11 = &Vtcat[0];
     Vtq1_12 = &Vtcat[(n*p)>>1];
-
-    /*mmwrite("Aq1_11_a.mtx", Aq1_11, m, p);*/
-    /*mmwrite("Aq1_12_a.mtx", Aq1_12, m, p);*/
-    /*mmwrite("Vtq1_11_a.mtx", Vtq1_11, p, n>>1);*/
-    /*mmwrite("Vtq1_12_a.mtx", Vtq1_12, p, n>>1);*/
 
     extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, &Up, &Sp, &Vtp, m, n, q, p);
 
