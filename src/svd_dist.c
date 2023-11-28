@@ -46,6 +46,7 @@ int generate_svd_dist_test
 
     *s = nloc;
     *Aloc = Apart;
+    *A = (myrank == root)? Aroot : NULL;
 
     MPI_Barrier(comm);
     return 0;

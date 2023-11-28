@@ -10,6 +10,8 @@
 #include "mmio_dense.h"
 #include "svd_dist.h"
 
+extern int log2i(int v);
+
 int main(int argc, char *argv[])
 {
     int myrank, nprocs;
@@ -17,9 +19,9 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-    if (argc != 9)
+    if (argc != 8)
     {
-        if (!myrank) fprintf(stderr, "usage: %s <outprefix> <m> <n> <p> <q> <r> <cond> <damp>\n", argv[0]);
+        if (!myrank) fprintf(stderr, "usage: %s <outprefix> <m> <n> <p> <r> <cond> <damp>\n", argv[0]);
         MPI_Finalize();
         return 1;
     }
@@ -28,16 +30,27 @@ int main(int argc, char *argv[])
     int m = atoi(argv[2]);
     int n = atoi(argv[3]);
     int p = atoi(argv[4]);
-    int q = atoi(argv[5]);
-    int r = atoi(argv[6]);
-    double cond = atof(argv[7]);
-    double damp = atof(argv[8]);
+    int r = atoi(argv[5]);
+    double cond = atof(argv[6]);
+    double damp = atof(argv[7]);
 
-    int s;
+    int s, q;
     double *A, *Aloc;
+
+    q =  log2i(nprocs);
 
     generate_svd_dist_test(&A, &Aloc, &s, m, n, r, cond, damp, 0, MPI_COMM_WORLD);
 
+    char fname[1024];
+    snprintf(fname, 1024, "Aloc_%d.mtx", myrank);
+    mmwrite(fname, Aloc, m, s);
+
+    if (myrank == 0)
+    {
+        mmwrite("A.mtx", A, m, n);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     return 0;
 }
