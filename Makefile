@@ -4,7 +4,7 @@ INCS=-I/opt/homebrew/Cellar/openblas/0.3.24/include -I/opt/homebrew/include -I./
 LIBS=-L/opt/homebrew/Cellar/lapack/3.11/lib -L/opt/homebrew/Cellar/openblas/0.3.24/lib
 LINKS=-llapacke -lopenblas
 OBJS=kiss.o mmio.o mmio_dense.o linalg_routines.o svd_routines.o
-PROGS=rand_svd
+PROGS=rand_svd2
 CFLAGS=-Wall
 
 D?=0
@@ -21,7 +21,7 @@ endif
 all: $(PROGS)
 	rm -rf *.o
 
-rand_svd: rand_svd.c $(OBJS)
+rand_svd2: rand_svd2.c $(OBJS)
 	$(CC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
 
 clean:

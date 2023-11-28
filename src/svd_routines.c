@@ -199,19 +199,22 @@ int combine_node(double *Aki12, double *Vtki12, int l, int m, int s, int p)
     return 0;
 }
 
-int seed_node(double const *A1i, double *Aki, double *Vtki, int m, int s, int p)
+int seed_node(double const *Ai, double *A1i, double *Vt1i, int m, int n, int q, int p)
 {
+    int b = 1 << q;
+    int s = n / b;
+
     double *Sp = malloc(p*sizeof(double));
 
-    svds_naive(A1i, Aki, Sp, Vtki, m, s, p);
+    svds_naive(Ai, A1i, Sp, Vt1i, m, s, p);
 
     /*
-     * Compute Up*Sp and write it to A1ki.
+     * Compute Up*Sp and write it to A1i.
      */
 
     for (int j = 0; j < p; ++j)
         for (int i = 0; i < m; ++i)
-            Aki[i + m*j] *= Sp[j];
+            A1i[i + m*j] *= Sp[j];
 
     free(Sp);
     return 0;

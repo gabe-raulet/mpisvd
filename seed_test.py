@@ -66,8 +66,8 @@ def create_example(m, n, r, p, q, cond, damp):
     else:
         return Az, Uz, Sz, Vtz
 
-n = 4096
-m = 512
+m = 4096
+n = 512
 r = 512
 p = 10
 q = 5
