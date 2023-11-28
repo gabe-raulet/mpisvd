@@ -160,3 +160,8 @@ print(f"|Up-Uc| = {Uerr:.10e}")
 print(f"|Sp-Sc| = {Serr:.10e}")
 print(f"|Vtp-Vtc| = {Vterr:.10e}")
 
+# mmwrite("A.mtx", A)
+# mmwrite("S.mtx", np.diag(S))
+# mmwrite("Spy.mtx", np.diag(Sc))
+# mmwrite("Upy.mtx", Uc)
+# mmwrite("Vtpy.mtx", Vtc)
