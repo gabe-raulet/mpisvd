@@ -13,9 +13,32 @@ int svds_naive(const double *A, double *Up, double *Sp, double *Vpt, int m, int 
 {
     assert(A != NULL && Up != NULL && Sp != NULL && Vpt != NULL && m >= n && n >= p && p >= 1);
 
-    double *S, *U, *Vt;
+    double *S, *U, *Vt, *work, *Acast = (double *)A;
+    int drank = m < n? m : n;
 
-    serial_thin_svd_lapack((double *)A, &S, &U, &Vt, m, n);
+    work = malloc(5*drank*sizeof(double));
+    S = malloc(drank*sizeof(double));
+    U = malloc(m*drank*sizeof(double));
+    Vt = malloc(drank*n*sizeof(double));
+
+    LAPACKE_dgesvd
+    (
+        LAPACK_COL_MAJOR,
+       'S',
+       'S',
+        m,
+        n,
+        Acast,
+        m,
+        S,
+        U,
+        m,
+        Vt,
+        drank,
+        work
+    );
+
+    /*serial_thin_svd_lapack((double *)A, &S, &U, &Vt, m, n);*/
 
     memcpy(Up, U, p*m*sizeof(double));
     memcpy(Sp, S, p*sizeof(double));

@@ -152,26 +152,34 @@ def check_errors(A, U, S, Vt, Urand, Srand, Vtrand, p):
     print(f"Serr={Serr:.18e}")
     print(f"Vterr={Vterr:.18e}\n")
 
-m = 4096
-n = 512
-r = 512
-p = 10
-q = 5
 cond = 100.
 damp = 2.
 
-A, U, S, Vt = create_example(m, n, r, p, q, cond, damp)
-mmwrite("A.mtx", A)
+# scalers = [1, 4, 16]
 
-Urand, Srand, Vtrand, Adict, Vtdict = binary_comb(A, p, q)
-check_errors(A, U, S, Vt, Urand, Srand, Vtrand, p)
+scalers = [4, 16]
 
-proc = sp.Popen(["./full_svd", "A.mtx", str(p), str(q)], stdout=sp.PIPE)
-proc.wait()
+for n in [128, 256, 1024]:
+    for scale in scalers:
+        m = scale * n
+        r = n
+        p = 10
+        for q in [3, 5, 8]:
+            s = n / (2**q)
+            if p > s: continue
 
-Scheck = np.diag(mmread("Sp_a.mtx"))
-Ucheck = mmread("Up_a.mtx")
-Vtcheck = mmread("Vtp_a.mtx")
+            A, U, S, Vt = create_example(m, n, r, p, q, cond, damp)
+            mmwrite("A.mtx", A)
 
-check_errors(A, U, S, Vt, Ucheck, Scheck, Vtcheck, p)
+            Urand, Srand, Vtrand, Adict, Vtdict = binary_comb(A, p, q)
+            check_errors(A, U, S, Vt, Urand, Srand, Vtrand, p)
+
+            proc = sp.Popen(["./full_svd", "A.mtx", str(p), str(q)], stdout=sp.PIPE)
+            proc.wait()
+
+            Scheck = np.diag(mmread("Sp_a.mtx"))
+            Ucheck = mmread("Up_a.mtx")
+            Vtcheck = mmread("Vtp_a.mtx")
+
+            check_errors(A, U, S, Vt, Ucheck, Scheck, Vtcheck, p)
 
