@@ -21,6 +21,9 @@ endif
 all: $(PROGS)
 	rm -rf *.o
 
+test: full_svd
+	python run_serial_tests.py
+
 full_svd: full_svd.c $(OBJS)
 	$(CC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
 

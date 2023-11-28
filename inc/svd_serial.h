@@ -16,4 +16,6 @@ int svd_serial
     int b /* number of seed nodes in binary topology */
 );
 
+int generate_svd_test(double **A_ref, int m, int n, int r, double cond, double damp);
+
 #endif

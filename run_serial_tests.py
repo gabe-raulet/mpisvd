@@ -102,7 +102,8 @@ def run_test(test_params, cnt):
 if __name__  == "__main__":
 
     # tests = create_test_parameters(colexps=[7,8,9], scalexps=[1], ranktests=1, pvals=[10], qvals=[3])
-    tests = create_test_parameters(colexps=[8,10], scalexps=[0,1], ranktests=2, pvals=[10], qvals=[3,5])
+    # tests = create_test_parameters(colexps=[8,10], scalexps=[0,1], ranktests=2, pvals=[10], qvals=[3,5])
+    tests = create_test_parameters(colexps=[8], scalexps=[0], ranktests=2, pvals=[10], qvals=[3,5])
 
     for cnt, test in enumerate(tests):
         run_test(test, cnt)
