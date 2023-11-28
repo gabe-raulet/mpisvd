@@ -9,4 +9,6 @@ int mmio_write_dense(FILE *f, double const *A, int m, int n, int row_major);
 double* mmread(char const *fname, int *m, int *n);
 int mmwrite(char const *fname, double const *A, int m, int n);
 
+int mmwrite_upper_triangular(char const *fname, double const *A, int n, int lda);
+
 #endif

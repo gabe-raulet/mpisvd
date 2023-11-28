@@ -142,7 +142,10 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
 
 
     LAPACKE_dgeqrf(LAPACK_COL_MAJOR, 2*d, p, W, 2*d, tau);
+    mmwrite_upper_triangular("Rki_a.mtx", W, p, 2*d);
+
     LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', p, W, 2*d);
+    mmwrite_upper_triangular("Rki_inv_a.mtx", W, p, 2*d);
 
     /*
      * Compute Aki = USki * inv(Rki).
