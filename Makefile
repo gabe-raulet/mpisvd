@@ -4,7 +4,7 @@ INCS=-I/opt/homebrew/Cellar/openblas/0.3.24/include -I/opt/homebrew/include -I./
 LIBS=-L/opt/homebrew/Cellar/lapack/3.11/lib -L/opt/homebrew/Cellar/openblas/0.3.24/lib
 LINKS=-llapacke -lopenblas
 OBJS=kiss.o mmio.o mmio_dense.o linalg_routines.o svd_routines.o
-PROGS=seed_test
+PROGS=seed_test comb_test
 CFLAGS=-Wall
 
 D?=0
@@ -22,6 +22,9 @@ all: $(PROGS)
 	rm -rf *.o
 
 seed_test: seed_test.c $(OBJS)
+	$(CC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
+
+comb_test: comb_test.c $(OBJS)
 	$(CC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
 
 clean:
