@@ -11,14 +11,24 @@ def param_check_and_get(m, n, q, p):
     s = n//b
     assert ispow2(m)
     assert ispow2(n)
+    # assert m >= n
     assert q >= 1
     assert n >= b
     assert s >= p and p >= 1
     return b, s
 
-def svds(A, p):
+def _svds(A, p):
     U, S, Vt = np.linalg.svd(A, full_matrices=False)
     return U[:,:p], S[:p], Vt[:p,:]
+
+def svds(A, p):
+    m, n = A.shape
+    assert p <= min(m,n)
+    if m >= n:
+        return _svds(A, p)
+    else:
+        Uz, Sz, Vtz = _svds(A.T, p)
+        return Vtz.T, Sz, Uz.T
 
 def seed_node(A, i, q, p):
     m, n = A.shape
@@ -96,7 +106,7 @@ def binary_comb(A, p, q):
 
     return Up, Sp, Vtp, Adict, Vtdict
 
-def create_example(m, n, r, p, q, cond, damp):
+def _create_example(m, n, r, p, q, cond, damp):
     param_check_and_get(m, n, q, p)
     assert 1 <= r <= n
 
@@ -114,10 +124,20 @@ def create_example(m, n, r, p, q, cond, damp):
 
     return A, U, S, Vt
 
+def create_example(m, n, r, p, q, cond, damp):
+    mz = max(m, n)
+    nz = min(m, n)
+    Az, Uz, Sz, Vtz = _create_example(mz, nz, r, p, q, cond, damp)
+
+    if m < n:
+        return Az.T, Vtz.T, Sz, Uz.T
+    else:
+        return Az, Uz, Sz, Vtz
+
 
 m = 512
-n = 512
-r = 256
+n = 4096
+r = 512
 p = 10
 q = 5
 cond = 100.
@@ -131,8 +151,13 @@ Ac = Uc@np.diag(Sc)@Vtc
 
 Up, Sp, Vtp = U[:,:p], S[:p], Vt[:p,:]
 
-print(f"|A-Ac| = {np.linalg.norm(A-Ac):.10e}")
-print(f"|Up-Uc| = {np.linalg.norm(Up-Uc):.10e}")
-print(f"|Vtp-Vtc| = {np.linalg.norm(Vtp-Vtc):.10e}")
-print(f"|Sp-Sc| = {np.linalg.norm(Sp-Sc):.10e}")
+Aerr = np.linalg.norm(A-Ac)
+Uerr = np.linalg.norm(Up@Up.T - Uc@Uc.T)
+Serr = np.linalg.norm(Sp-Sc)
+Vterr = np.linalg.norm(Vtp.T@Vtp - Vtc.T@Vtc)
+
+print(f"|A-Ac| = {Aerr:.10e}")
+print(f"|Up-Uc| = {Uerr:.10e}")
+print(f"|Sp-Sc| = {Serr:.10e}")
+print(f"|Vtp-Vtc| = {Vterr:.10e}")
 
