@@ -98,9 +98,9 @@ int main(int argc, char *argv[])
 
     extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, &Up, &Sp, &Vtp, m, n, q, p);
 
-    /*mmwrite("Up_a.mtx", Up, m, p);*/
-    /*mmwrite("Vtp_a.mtx", Vtp, p, n);*/
-    /*mmwrite_diagonal("Sp_a.mtx", Sp, n);*/
+    mmwrite_diagonal("Sp_a.mtx", Sp, n);
+    mmwrite("Up_a.mtx", Up, m, p);
+    mmwrite("Vtp_a.mtx", Vtp, p, n);
 
     free(A);
     return 0;
