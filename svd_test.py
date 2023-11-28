@@ -101,6 +101,11 @@ def binary_comb(A, p, q):
     Vtq1_11 = Vtdict[0]
     Vtq1_12 = Vtdict[1]
 
+    mmwrite("Aq1_11_c.mtx", Aq1_11);
+    mmwrite("Aq1_12_c.mtx", Aq1_12);
+    mmwrite("Vtq1_11_c.mtx", Vtq1_11);
+    mmwrite("Vtq1_12_c.mtx", Vtq1_12);
+
     Up, Sp, Vtp = extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, m, n, q, p)
 
     return Up, Sp, Vtp, Adict, Vtdict
@@ -160,7 +165,8 @@ print(f"|Up-Uc| = {Uerr:.10e}")
 print(f"|Sp-Sc| = {Serr:.10e}")
 print(f"|Vtp-Vtc| = {Vterr:.10e}")
 
-# mmwrite("A.mtx", A)
+mmwrite("A.mtx", A)
+# mmwrite("Sp_c.mtx", np.diag(Sp))
 # mmwrite("S.mtx", np.diag(S))
 # mmwrite("Spy.mtx", np.diag(Sc))
 # mmwrite("Upy.mtx", Uc)

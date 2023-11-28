@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
 
     A = mmread(argv[1], &m, &n);
 
-    assert(!(m&(m-1)) && (n&(n-1))); /* m and n should be powers of 2 */
+    assert(!(m&(m-1)) && !(n&(n-1))); /* m and n should be powers of 2 */
     assert(m >= n); /* temporary */
 
     p = atoi(argv[2]); /* p-truncated svd */
@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     b = 1 << q; /* number of nodes */
     assert(n > b);
 
-    s = b / n; /* entry column split count */
+    s = n / b; /* entry column split count */
     assert(s >= p);
 
     double *Acat, *Vtcat;
@@ -91,11 +91,16 @@ int main(int argc, char *argv[])
     Vtq1_11 = &Vtcat[0];
     Vtq1_12 = &Vtcat[(n*p)>>1];
 
-    extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, &Up, &Sp, &Vtp, m, n, q, p);
+    mmwrite("Aq1_11_a.mtx", Aq1_11, m, p);
+    mmwrite("Aq1_12_a.mtx", Aq1_12, m, p);
+    mmwrite("Vtq1_11_a.mtx", Vtq1_11, p, n>>1);
+    mmwrite("Vtq1_12_a.mtx", Vtq1_12, p, n>>1);
 
-    mmwrite("Up_a.mtx", Up, m, p);
-    mmwrite("Vtp_a.mtx", Vtp, p, n);
-    mmwrite_diagonal("Sp_a.mtx", Sp, n);
+    /*extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, &Up, &Sp, &Vtp, m, n, q, p);*/
+
+    /*mmwrite("Up_a.mtx", Up, m, p);*/
+    /*mmwrite("Vtp_a.mtx", Vtp, p, n);*/
+    /*mmwrite_diagonal("Sp_a.mtx", Sp, n);*/
 
     free(A);
     return 0;
