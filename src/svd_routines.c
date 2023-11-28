@@ -99,38 +99,38 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
     double *W = malloc((2*d)*p*sizeof(double));
 
 
-    //cblas_dgemm
-    //(
-    //    CblasColMajor, /* all matrices stored column-major */
-    //       CblasTrans, /* transpose Vhtki */
-    //       CblasTrans, /* transpose Vtki */
-    //              2*d, /* number of rows of W (and Tr(Vhtki)) */
-    //                p, /* number of columns of W (and Tr(Vtki)) */
-    //              2*p, /* number of columns of Tr(Vhtki) (and number of rows of Tr(Vtki)) */
-    //              1.0, /* the alpha in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
-    //            Vhtki, /* Vhtki matrix */
-    //              2*p, /* leading dimension of Vhtki */
-    //             Vtki, /* Vtki matrix */
-    //                p, /* leading dimension of Vtki */
-    //              0.0, /* the beta in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
-    //                W, /* W matrix */
-    //              2*u  /* leading dimension of W */
-    //);
+    cblas_dgemm
+    (
+        CblasColMajor, /* all matrices stored column-major */
+           CblasTrans, /* transpose Vhtki */
+           CblasTrans, /* transpose Vtki */
+                  2*d, /* number of rows of W (and Tr(Vhtki)) */
+                    p, /* number of columns of W (and Tr(Vtki)) */
+                  2*p, /* number of columns of Tr(Vhtki) (and number of rows of Tr(Vtki)) */
+                  1.0, /* the alpha in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
+                Vhtki, /* Vhtki matrix */
+                  2*p, /* leading dimension of Vhtki */
+                 Vtki, /* Vtki matrix */
+                    p, /* leading dimension of Vtki */
+                  0.0, /* the beta in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
+                    W, /* W matrix */
+                  2*d  /* leading dimension of W */
+    );
 
-    for (int i = 0; i < 2*d; ++i)
-        for (int j = 0; j < p; ++j)
-        {
-            double acc = 0;
-            for (int l = 0; l < 2*p; ++l)
-            {
-                double vil = Vhtki[l + i*2*p]; /* Tr(Vhtki)[i,l] = Vhtki[l,i] */
-                double vlj = Vtki[j + l*p]; /* Tr(Vtki)[l,j] = Vtki[j,l] */
+    /*for (int i = 0; i < 2*d; ++i)*/
+        /*for (int j = 0; j < p; ++j)*/
+        /*{*/
+            /*double acc = 0;*/
+            /*for (int l = 0; l < 2*p; ++l)*/
+            /*{*/
+                /*double vil = Vhtki[l + i*2*p]; [> Tr(Vhtki)[i,l] = Vhtki[l,i] <]*/
+                /*double vlj = Vtki[j + l*p]; [> Tr(Vtki)[l,j] = Vtki[j,l] <]*/
 
-                acc += vil*vlj;
-            }
+                /*acc += vil*vlj;*/
+            /*}*/
 
-            W[i + j*2*d] = acc;
-        }
+            /*W[i + j*2*d] = acc;*/
+        /*}*/
 
     free(Vtki);
     free(Vhtki);
