@@ -54,7 +54,6 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
 {
     int b = 1 << q;
     int s = n / b;
-    /*int c = 1 << (q-k);*/
     int d = (1 << (k-1)) * s;
 
     double *Aki = malloc(m*(2*p)*sizeof(double));

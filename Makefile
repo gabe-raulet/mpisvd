@@ -28,10 +28,10 @@ comb_test: comb_test.c $(OBJS)
 	$(CC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
 
 clean:
-	rm -rf *.dSYM *.o *.out
+	rm -rf *.dSYM *.o *.out *.mtx
 
 distclean: clean
-	rm -rf $(PROGS) *.mtx
+	rm -rf $(PROGS)
 
 mmio.o: inc/mmio.h
 mmio_dense.o: inc/mmio_dense.h inc/mmio.h

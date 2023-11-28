@@ -87,7 +87,7 @@ if __name__ == "__main__":
     n = 128
     r = 128
     p = 10
-    q = 1
+    q = 3
     cond = 100.
     damp = 2.
 
@@ -107,13 +107,14 @@ if __name__ == "__main__":
     Vtk_2i_0 = Vtcat[0]
     Vtk_2i_1 = Vtcat[1]
 
-    Ak1_lj, Vtk1_lj = combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, m, n, 0, 1, q, p)
-
-    mmwrite("A.mtx", A)
     mmwrite("Ak_2i_0.mtx", Ak_2i_0)
     mmwrite("Ak_2i_1.mtx", Ak_2i_1)
     mmwrite("Vtk_2i_0.mtx", Vtk_2i_0)
     mmwrite("Vtk_2i_1.mtx", Vtk_2i_1)
+
+    Ak1_lj, Vtk1_lj = combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, m, n, 0, 1, q, p)
+
+    mmwrite("A.mtx", A)
     mmwrite("Ak1_lj_correct.mtx", Ak1_lj)
     mmwrite("Vtk1_lj_correct.mtx", Vtk1_lj)
 
