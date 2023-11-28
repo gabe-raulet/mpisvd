@@ -276,6 +276,7 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
     LAPACKE_dorgqr(LAPACK_COL_MAJOR, n, p, p, W, n, tau);
 
     double *Aq = USq;
+    double *Qq = W;
     double *Uc = malloc(m*p*sizeof(double));
     double *Sc = malloc(p*sizeof(double));
     double *Vtp = malloc(p*n*sizeof(double));
@@ -284,10 +285,12 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
     svds_naive(Aq, Uc, Sc, Vtp, m, p, p);
 
     /*
-     * Vtc = Vtp@Qq.T
+     * Uc is m-by-p
+     * Sc is p-by-p
+     * Vtp is p-by-p
+     * Qq is n-by-p
      *
-     * Vtp is p-by-n
-     * Qq.T is n-by-p
+     * Vtc = Vtp*Qq.T is p-by-n
      */
 
     cblas_dgemm
@@ -296,15 +299,15 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
          CblasNoTrans, /* don't transpose A */
            CblasTrans, /* transpose B */
                     p, /* number of rows of C */
-                    p, /* number of columns of C */
-                    n, /* number of columns of A */
+                    n, /* number of columns of C */
+                    p, /* number of columns of A */
                   1.0, /* the alpha in "C <- alpha*op(A)*op(B) + beta*C" */
                   Vtp, /* A matrix */
                     p, /* leading dimension of A */
-                    W, /* B matrix */
+                   Qq, /* B matrix */
                     n, /* leading dimension of B */
                   0.0, /* beta */
-                  Vtc, /* W matrix */
+                  Vtc, /* C matrix */
                     p  /* leading dimension of C */
     );
 

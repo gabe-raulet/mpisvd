@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import subprocess as sp
 from scipy.io import mmread, mmwrite
 
 def ispow2(v):
@@ -138,6 +139,18 @@ def create_example(m, n, r, p, q, cond, damp):
     else:
         return Az, Uz, Sz, Vtz
 
+def check_errors(A, U, S, Vt, Urand, Srand, Vtrand, p):
+    assert Urand.shape[0] == A.shape[0] and Urand.shape[1] == p and len(Srand) == p and Vtrand.shape[0] == p and Vtrand.shape[1] == A.shape[1]
+    Up, Sp, Vtp = U[:,:p], S[:p], Vt[:p,:]
+    Arand = Urand@np.diag(Srand)@Vtrand
+    Aerr = np.linalg.norm(A-Arand)
+    Uerr = np.linalg.norm(Up@Up.T - Urand@Urand.T)
+    Serr = np.linalg.norm(Sp - Srand)
+    Vterr = np.linalg.norm(Vtp.T@Vtp - Vtrand.T@Vtrand)
+    print(f"Aerr={Aerr:.18e}")
+    print(f"Uerr={Uerr:.18e}")
+    print(f"Serr={Serr:.18e}")
+    print(f"Vterr={Vterr:.18e}\n")
 
 m = 4096
 n = 512
@@ -148,24 +161,17 @@ cond = 100.
 damp = 2.
 
 A, U, S, Vt = create_example(m, n, r, p, q, cond, damp)
-
-Uc, Sc, Vtc, Adict, Vtdict = binary_comb(A, p, q)
-
-Ac = Uc@np.diag(Sc)@Vtc
-
-Up, Sp, Vtp = U[:,:p], S[:p], Vt[:p,:]
-
-Aerr = np.linalg.norm(A-Ac)
-Uerr = np.linalg.norm(Up@Up.T - Uc@Uc.T)
-Serr = np.linalg.norm(Sp-Sc)
-Vterr = np.linalg.norm(Vtp.T@Vtp - Vtc.T@Vtc)
-
-print(f"|A-Ac| = {Aerr:.10e}")
-print(f"|Up-Uc| = {Uerr:.10e}")
-print(f"|Sp-Sc| = {Serr:.10e}")
-print(f"|Vtp-Vtc| = {Vterr:.10e}")
-
 mmwrite("A.mtx", A)
-mmwrite("Sp_c.mtx", np.diag(Sp))
-mmwrite("Up_c.mtx", Up)
-mmwrite("Vtp_c.mtx", Vtp)
+
+Urand, Srand, Vtrand, Adict, Vtdict = binary_comb(A, p, q)
+check_errors(A, U, S, Vt, Urand, Srand, Vtrand, p)
+
+proc = sp.Popen(["./full_svd", "A.mtx", str(p), str(q)], stdout=sp.PIPE)
+proc.wait()
+
+Scheck = np.diag(mmread("Sp_a.mtx"))
+Ucheck = mmread("Up_a.mtx")
+Vtcheck = mmread("Vtp_a.mtx")
+
+check_errors(A, U, S, Vt, Ucheck, Scheck, Vtcheck, p)
+
