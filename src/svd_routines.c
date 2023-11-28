@@ -3,10 +3,63 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#include "kiss.h"
 #include "cblas.h"
 #include "lapacke.h"
 #include "svd_routines.h"
 #include "mmio_dense.h"
+
+int iseed[4];
+
+int iseed_init()
+{
+    static int initialized = 0;
+
+    if (initialized)
+        return 0;
+
+    kiss_init();
+
+    for (int i = 0; i < 4; ++i) iseed[i] = (kiss_rand() % 4096);
+    iseed[3] &= (iseed[3]^1); /* iseed[3] must be odd */
+    initialized = 1;
+    return 0;
+}
+
+int generate_svd_test(double **A_ref, int m, int n, int r, double cond, double damp)
+{
+    iseed_init();
+
+    if (!A_ref)
+    {
+        fprintf(stderr, "[error] generate_svd_test: invalid arguments\n");
+        return -1;
+    }
+
+    if (m < n || n <= 0 || r > n)
+    {
+        fprintf(stderr, "[error] generate_svd_test: must have 1 <= r <= n <= m");
+        return -1;
+    }
+
+    if ((m&(m-1)) || (n&(n-1)))
+    {
+        fprintf(stderr, "[error] generate_svd_test: currently only works with m, n being powers of 2\n");
+        return -1;
+    }
+
+    double *A = malloc(m*n*sizeof(double));
+    double *S = calloc(n, sizeof(double));
+
+    S[0] = cond;
+    for (int i = 1; i < r; ++i) S[i] = S[i-1] / damp;
+
+    LAPACKE_dlatms(LAPACK_COL_MAJOR, m, n, 'U', iseed, 'N', S, 0, 0., 0., m, n, 'N', A, m);
+    free(S);
+
+    *A_ref = A;
+    return 0;
+}
 
 int svds_naive(const double *A, double *Up, double *Sp, double *Vpt, int m, int n, int p)
 {

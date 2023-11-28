@@ -156,15 +156,15 @@ cond = 100.
 damp = 2.
 
 # scalers = [1, 4, 16]
-
-scalers = [4, 16]
+# scalers = [4, 16]
+scalers=[16]
 
 for n in [128, 256, 1024]:
     for scale in scalers:
         m = scale * n
         r = n
         p = 10
-        for q in [3, 5, 8]:
+        for q in [3]:
             s = n / (2**q)
             if p > s: continue
 
@@ -176,6 +176,10 @@ for n in [128, 256, 1024]:
 
             proc = sp.Popen(["./full_svd", "A.mtx", str(p), str(q)], stdout=sp.PIPE)
             proc.wait()
+
+            if proc.returncode != 0:
+                print(f"./full_svd exited with non-zero status")
+                sys.exit(1)
 
             Scheck = np.diag(mmread("Sp_a.mtx"))
             Ucheck = mmread("Up_a.mtx")

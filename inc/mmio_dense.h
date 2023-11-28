@@ -12,4 +12,6 @@ int mmwrite(char const *fname, double const *A, int m, int n);
 int mmwrite_diagonal(char const *fname, double const *D, int n);
 int mmwrite_upper_triangular(char const *fname, double const *A, int n, int lda);
 
+int write_diag(const char *fname, const double *D, int n);
+
 #endif

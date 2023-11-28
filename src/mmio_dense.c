@@ -153,3 +153,12 @@ int mmwrite(char const *fname, double const *A, int m, int n)
 
     return 0;
 }
+
+int write_diag(const char *fname, const double *D, int n)
+{
+    FILE *f = fopen(fname, "w");
+    for (int i = 0; i < n; ++i)
+        fprintf(f, "%.18e\n", D[i]);
+    fclose(f);
+    return 0;
+}
