@@ -33,21 +33,9 @@ int main(int argc, char *argv[])
     q = atoi(argv[3]);
     param_check_and_get(m, n, q, p, &b, &s);
 
-    double *Acat = malloc(m*p*b*sizeof(double));
-    double *Vtcat = malloc(p*s*b*sizeof(double)); /* note: s*b == n */
-
     double const *Ai;
     double *A1i;
     double *Vt1i;
-
-    for (int i = 0; i < b; ++i)
-    {
-        Ai = &A[i*m*s];
-        A1i = &Acat[i*m*p]; printf("A1%d = &Acat[%d*%d*%d] = &Acat[%d]\n", i, i, m, p, i*m*p);
-        Vt1i = &Vtcat[i*p*s]; printf("Vt1%d = &Vtcat[%d*%d*%d] = &Vtcat[%d]\n", i, i, p, s, i*p*s);
-
-        seed_node(Ai, A1i, Vt1i, m, n, q, p);
-    }
 
     f = fopen("Aseed_test.mtx", "w");
     mmio_write_dense(f, Acat, m, p*b, 0);
@@ -57,31 +45,6 @@ int main(int argc, char *argv[])
     mmio_write_dense(f, Vtcat, p, s*b, 0);
     fclose(f);
 
-    //for (int k = 1; k < q; ++k)
-    //{
-    //    int c = 1 << (q-k);
-    //    int d = s * (1 << (k-1));
-
-    //    for (int i = 0; i < c; ++i)
-    //    {
-    //        double *Ak_2i_0; /* m-by-p */
-    //        double *Ak_2i_1; /* m-by-p */
-    //        double *Vtk_2i_0; /* p-by-d */
-    //        double *Vtk_2i_1; /* p-by-d */
-    //        double *Ak1_lj; /* m-by-2p */
-    //        double *Vtk1_lj; /* p-by-2d; d := s * (2^(k-1)) */
-
-    //        Ak_2i_0 = &Acat[(2*i)*m*p]; printf("A%d_2%d_0 = &Acat[%d*%d*%d] = &Acat[%d]\n", k, i, 2*i, m, p, 2*i*m*p);
-    //        Ak_2i_1 = &Acat[(2*i+1)*m*p]; printf("A%d_2%d_1 = &Acat[%d*%d*%d] = &Acat[%d]\n", k, i, 2*i+1, m, p, (2*i+1)*m*p);
-    //        Vtk_2i_0 = &Vtcat[(2*i)*d*s]; printf("Vt%d_2%d_0 = &Vtcat[%d*%d*%d] = &Vtcat[%d]\n", k, i, 2*i, d, s, 2*i*d*s);
-    //        Vtk_2i_1 = &Vtcat[(2*i+1)*d*s]; printf("Vt%d_2%d_1 = &Vtcat[%d*%d*%d] = &Vtcat[%d]\n", k, i, 2*i+1, d, s, (2*i+1)*d*s);
-
-    //        Ak1_lj = &Acat[i*m*p];
-    //        Vtk1_lj = &Vtcat[i*p*(2*d)];
-
-    //        combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
-    //    }
-    //}
 
     f = fopen("Acombs_test.mtx", "w");
     mmio_write_dense(f, Acat, m, p*2, 0);

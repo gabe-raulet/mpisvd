@@ -50,37 +50,30 @@ int svds_naive(const double *A, double *Up, double *Sp, double *Vpt, int m, int 
     return 0;
 }
 
-int combine_node(double *Aki12, double *Vtki12, int l, int m, int s, int p)
+int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk_2i_1, double *Ak1_lj, double *Vtk1_lj, int m, int n, int k, int q, int p)
 {
-    int u = (1 << (l-1))*s;
+    int b = 1 << q;
+    int s = n / b;
+    /*int c = 1 << (q-k);*/
+    int d = (1 << (k-1)) * s;
 
-    double *Aki;    /* m-by-2p @ &Aki12[0] */
-    double *Vtki1;  /* p-by-u @ &Vtki12[0] */
-    double *Vtki2;  /* p-by-u @ &Vtki12[p*u] */
-    double *Vhtki;  /* 2p-by-2u */
-    double *Uki;    /* m-by-p */
-    double *Ski;    /* p-by-p (diagonal) */
-    double *USki;   /* m-by-p */
-    double *Vtki;   /* p-by-2p */
-    double *W;      /* 2u-by-p :: == Tr(Vhtki)*Tr(Vtki) */
-    double *Qki;    /* 2u-by-p */
-    double *Rki;    /* p-by-p */
-    double *tau;
+    double *Aki = malloc(m*(2*p)*sizeof(double));
 
-    (void)Qki;
-    (void)Rki;
+    memcpy(&Aki[0],   Ak_2i_0, m*p*sizeof(double));
+    memcpy(&Aki[m*p], Ak_2i_1, m*p*sizeof(double));
 
-    Aki = Aki12;
-    Vtki1 = Vtki12;
-    Vtki2 = &Vtki12[p*u];
+    double *Vhtki = calloc((2*p)*(2*d), sizeof(double));
 
-    /*
-     * Take the p-truncated SVD of Aki = Uki*Ski*Vtki.
-     */
+    for (int j = 0; j < d; ++j)
+    {
+        memcpy(&Vhtki[j*(2*p)], &Vtk_2i_0[j*p], p*sizeof(double));
+        memcpy(&Vhtki[(j+d)*(2*p)+p], &Vtk_2i_1[j*p], p*sizeof(double));
+    }
 
-    Uki = malloc(m*p*sizeof(double));
-    Ski = malloc(p*sizeof(double));
-    Vtki = malloc(p*(2*p)*sizeof(double));
+
+    double *Uki = malloc(m*p*sizeof(double));
+    double *Ski = malloc(p*sizeof(double));
+    double *Vtki = malloc(p*(2*p)*sizeof(double));
 
     svds_naive(Aki, Uki, Ski, Vtki, m, 2*p, p);
 
@@ -88,7 +81,7 @@ int combine_node(double *Aki12, double *Vtki12, int l, int m, int s, int p)
      * Compute USki = Uki*Ski.
      */
 
-    USki = Uki;
+    double *USki = Uki;
 
     for (int j = 0; j < p; ++j)
         for (int i = 0; i < m; ++i)
@@ -97,44 +90,48 @@ int combine_node(double *Aki12, double *Vtki12, int l, int m, int s, int p)
     free(Ski);
 
     /*
-     * Construct Vhtki = [Vtki1 0; 0 Vtki2].
-     */
-
-    Vhtki = calloc((2*p)*(2*u), sizeof(double));
-
-    for (int j = 0; j < u; ++j)
-    {
-        memcpy(&Vhtki[j*(2*p)], &Vtki1[j*p], p*sizeof(double));
-        memcpy(&Vhtki[(j+u)*(2*p)+p], &Vtki2[j*p], p*sizeof(double));
-    }
-
-    /*
      * Compute W = Tr(Vhtki)*Tr(Vtki).
      *
-     * W :: 2u-by-p
-     * Tr(Vhtki) :: 2u-by-2p
+     * W :: 2d-by-p
+     * Tr(Vhtki) :: 2d-by-2p
      * Tr(Vtki) :: 2p-by-p
      */
 
-    W = malloc((2*u)*p*sizeof(double));
+    double *W = malloc((2*d)*p*sizeof(double));
 
-    cblas_dgemm
-    (
-        CblasColMajor, /* all matrices stored column-major */
-           CblasTrans, /* transpose Vhtki */
-           CblasTrans, /* transpose Vtki */
-                  2*u, /* number of rows of W (and Tr(Vhtki)) */
-                    p, /* number of columns of W (and Tr(Vtki)) */
-                  2*p, /* number of columns of Tr(Vhtki) (and number of rows of Tr(Vtki)) */
-                  1.0, /* the alpha in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
-                Vhtki, /* Vhtki matrix */
-                  2*p, /* leading dimension of Vhtki */
-                 Vtki, /* Vtki matrix */
-                    p, /* leading dimension of Vtki */
-                  0.0, /* the beta in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
-                    W, /* W matrix */
-                  2*u  /* leading dimension of W */
-    );
+
+    //cblas_dgemm
+    //(
+    //    CblasColMajor, /* all matrices stored column-major */
+    //       CblasTrans, /* transpose Vhtki */
+    //       CblasTrans, /* transpose Vtki */
+    //              2*d, /* number of rows of W (and Tr(Vhtki)) */
+    //                p, /* number of columns of W (and Tr(Vtki)) */
+    //              2*p, /* number of columns of Tr(Vhtki) (and number of rows of Tr(Vtki)) */
+    //              1.0, /* the alpha in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
+    //            Vhtki, /* Vhtki matrix */
+    //              2*p, /* leading dimension of Vhtki */
+    //             Vtki, /* Vtki matrix */
+    //                p, /* leading dimension of Vtki */
+    //              0.0, /* the beta in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
+    //                W, /* W matrix */
+    //              2*u  /* leading dimension of W */
+    //);
+
+    for (int i = 0; i < 2*d; ++i)
+        for (int j = 0; j < p; ++j)
+        {
+            double acc = 0;
+            for (int l = 0; l < 2*p; ++l)
+            {
+                double vil = Vhtki[l + i*2*p]; /* Tr(Vhtki)[i,l] = Vhtki[l,i] */
+                double vlj = Vtki[j + l*p]; /* Tr(Vtki)[l,j] = Vtki[j,l] */
+
+                acc += vil*vlj;
+            }
+
+            W[i + j*2*d] = acc;
+        }
 
     free(Vtki);
     free(Vhtki);
@@ -142,26 +139,17 @@ int combine_node(double *Aki12, double *Vtki12, int l, int m, int s, int p)
     /*
      * Compute QR-factorization W = Qki*Rki.
      *
-     * W :: 2u-by-p
-     * Qki :: 2u-by-p
+     * W :: 2d-by-p
+     * Qki :: 2d-by-p
      * Rki :: p-by-p
      */
 
-    assert(2*u >= p);
+    assert(2*d >= p);
+    double *tau = malloc(p*sizeof(double));
 
-    tau = malloc(p*sizeof(double));
 
-    LAPACKE_dgeqrf(LAPACK_COL_MAJOR, 2*u, p, W, 2*u, tau);
-
-    /*
-     * W now contains Rki in its leading p-by-p upper triangular portion.
-     * Compute Rki^{-1} in-place with DTRTRI. On exit, The upper triangular
-     * portion will then store Rki^{-1}, and lucky for us the entries in the
-     * strictly lower triangular portion of W are untouched, so we can use the
-     * reflectors stored there to reconstruct Q after with DORGQR.
-     */
-
-    LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', p, W, 2*u);
+    LAPACKE_dgeqrf(LAPACK_COL_MAJOR, 2*d, p, W, 2*d, tau);
+    LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', p, W, 2*d);
 
     /*
      * Compute Aki = USki * inv(Rki).
@@ -187,17 +175,172 @@ int combine_node(double *Aki12, double *Vtki12, int l, int m, int s, int p)
                     m  /* leading dimension of USki */
     );
 
-    LAPACKE_dorgqr(LAPACK_COL_MAJOR, 2*u, p, p, W, 2*u, tau);
-    free(tau);
+    LAPACKE_dorgqr(LAPACK_COL_MAJOR, 2*d, p, p, W, 2*d, tau);
 
-    memcpy(Aki, USki, m*p*sizeof(double));
+    memcpy(Ak1_lj, USki, m*p*sizeof(double));
 
-    naive_transpose(Vtki12, W, 2*u, p);
+    /* Vtk1_lj[j,i] = W[i,j]; W is 2d-by-p */
 
+    for (int j = 0; j < p; ++j)
+        for (int i = 0; i < 2*d; ++i)
+            Vtk1_lj[j + i*p] = W[i + j*2*d];
+
+    free(Aki);
     free(Uki);
     free(W);
+    free(tau);
+
     return 0;
 }
+
+//int combine_node(double *Aki12, double *Vtki12, int l, int m, int s, int p)
+//{
+//    int u = (1 << (l-1))*s;
+//
+//    double *Aki;    /* m-by-2p @ &Aki12[0] */
+//    double *Vtki1;  /* p-by-u @ &Vtki12[0] */
+//    double *Vtki2;  /* p-by-u @ &Vtki12[p*u] */
+//    double *Vhtki;  /* 2p-by-2u */
+//    double *Uki;    /* m-by-p */
+//    double *Ski;    /* p-by-p (diagonal) */
+//    double *USki;   /* m-by-p */
+//    double *Vtki;   /* p-by-2p */
+//    double *W;      /* 2u-by-p :: == Tr(Vhtki)*Tr(Vtki) */
+//    double *Qki;    /* 2u-by-p */
+//    double *Rki;    /* p-by-p */
+//    double *tau;
+//
+//    (void)Qki;
+//    (void)Rki;
+//
+//    Aki = Aki12;
+//    Vtki1 = Vtki12;
+//    Vtki2 = &Vtki12[p*u];
+//
+//    /*
+//     * Take the p-truncated SVD of Aki = Uki*Ski*Vtki.
+//     */
+//
+//    Uki = malloc(m*p*sizeof(double));
+//    Ski = malloc(p*sizeof(double));
+//    Vtki = malloc(p*(2*p)*sizeof(double));
+//
+//    svds_naive(Aki, Uki, Ski, Vtki, m, 2*p, p);
+//
+//    /*
+//     * Compute USki = Uki*Ski.
+//     */
+//
+//    USki = Uki;
+//
+//    for (int j = 0; j < p; ++j)
+//        for (int i = 0; i < m; ++i)
+//            USki[i + j*m] *= Ski[j];
+//
+//    free(Ski);
+//
+//    /*
+//     * Construct Vhtki = [Vtki1 0; 0 Vtki2].
+//     */
+//
+//    Vhtki = calloc((2*p)*(2*u), sizeof(double));
+//
+//    for (int j = 0; j < u; ++j)
+//    {
+//        memcpy(&Vhtki[j*(2*p)], &Vtki1[j*p], p*sizeof(double));
+//        memcpy(&Vhtki[(j+u)*(2*p)+p], &Vtki2[j*p], p*sizeof(double));
+//    }
+//
+//    /*
+//     * Compute W = Tr(Vhtki)*Tr(Vtki).
+//     *
+//     * W :: 2u-by-p
+//     * Tr(Vhtki) :: 2u-by-2p
+//     * Tr(Vtki) :: 2p-by-p
+//     */
+//
+//    W = malloc((2*u)*p*sizeof(double));
+//
+//    cblas_dgemm
+//    (
+//        CblasColMajor, /* all matrices stored column-major */
+//           CblasTrans, /* transpose Vhtki */
+//           CblasTrans, /* transpose Vtki */
+//                  2*u, /* number of rows of W (and Tr(Vhtki)) */
+//                    p, /* number of columns of W (and Tr(Vtki)) */
+//                  2*p, /* number of columns of Tr(Vhtki) (and number of rows of Tr(Vtki)) */
+//                  1.0, /* the alpha in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
+//                Vhtki, /* Vhtki matrix */
+//                  2*p, /* leading dimension of Vhtki */
+//                 Vtki, /* Vtki matrix */
+//                    p, /* leading dimension of Vtki */
+//                  0.0, /* the beta in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
+//                    W, /* W matrix */
+//                  2*u  /* leading dimension of W */
+//    );
+//
+//    free(Vtki);
+//    free(Vhtki);
+//
+//    /*
+//     * Compute QR-factorization W = Qki*Rki.
+//     *
+//     * W :: 2u-by-p
+//     * Qki :: 2u-by-p
+//     * Rki :: p-by-p
+//     */
+//
+//    assert(2*u >= p);
+//
+//    tau = malloc(p*sizeof(double));
+//
+//    LAPACKE_dgeqrf(LAPACK_COL_MAJOR, 2*u, p, W, 2*u, tau);
+//
+//    /*
+//     * W now contains Rki in its leading p-by-p upper triangular portion.
+//     * Compute Rki^{-1} in-place with DTRTRI. On exit, The upper triangular
+//     * portion will then store Rki^{-1}, and lucky for us the entries in the
+//     * strictly lower triangular portion of W are untouched, so we can use the
+//     * reflectors stored there to reconstruct Q after with DORGQR.
+//     */
+//
+//    LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', p, W, 2*u);
+//
+//    /*
+//     * Compute Aki = USki * inv(Rki).
+//     *
+//     * Aki :: m-by-p
+//     * USki :: m-by-p
+//     * inv(Rki) :: p-by-p :: upper triangular stored in in W
+//     */
+//
+//    cblas_dtrmm
+//    (
+//        CblasColMajor, /* all matrices stored column-major */
+//           CblasRight, /* triangular matrix on the right */
+//           CblasUpper, /* Rki is upper triangular */
+//         CblasNoTrans, /* don't transpose Rki */
+//         CblasNonUnit, /* Rki not necessarily unit triangular */
+//                    m, /* number of rows of USki */
+//                    p, /* number of columns of USki */
+//                  1.0, /* the alpha in Aki := alpha*USki*inv(Rki) */
+//                    W, /* inv(Rki) contained in the upper triangular portion of W */
+//                    m, /* leading dimension of W */
+//                 USki, /* USki on entry, Aki on exit */
+//                    m  /* leading dimension of USki */
+//    );
+//
+//    LAPACKE_dorgqr(LAPACK_COL_MAJOR, 2*u, p, p, W, 2*u, tau);
+//    free(tau);
+//
+//    memcpy(Aki, USki, m*p*sizeof(double));
+//
+//    naive_transpose(Vtki12, W, 2*u, p);
+//
+//    free(Uki);
+//    free(W);
+//    return 0;
+//}
 
 int seed_node(double const *Ai, double *A1i, double *Vt1i, int m, int n, int q, int p)
 {

@@ -1,4 +1,3 @@
-
 import sys
 import numpy as np
 from scipy.io import mmread, mmwrite
@@ -29,32 +28,6 @@ def svds(A, p):
     else:
         Uz, Sz, Vtz = _svds(A.T, p)
         return Vtz.T, Sz, Uz.T
-
-def seed_node(A, i, q, p):
-    m, n = A.shape
-    b, s = param_check_and_get(m, n, q, p)
-    assert 0 <= i and i < b
-    Ai = A[:, i*s:(i+1)*s]
-    Ui, Si, Vti = svds(Ai, p)
-    return Ui@np.diag(Si), Vti
-
-def _create_example(m, n, r, p, q, cond, damp):
-    param_check_and_get(m, n, q, p)
-    assert 1 <= r <= n
-
-    A = np.random.random((m,n))
-    S = np.zeros(n, dtype=np.double)
-
-    S[0] = cond
-    for i in range(1, r):
-        S[i] = S[i-1]/damp
-
-    U = np.linalg.qr(np.random.random((m,n)))[0]
-    Vt = np.linalg.qr(np.random.random((n,n)))[0]
-
-    A = U@np.diag(S)@Vt
-
-    return A, U, S, Vt
 
 def combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, m, n, i, k, q, p):
     b, s = param_check_and_get(m, n, q, p)
@@ -88,52 +61,28 @@ def create_example(m, n, r, p, q, cond, damp):
         return Az, Uz, Sz, Vtz
 
 if __name__ == "__main__":
-    if len(sys.argv) != 8:
-        sys.stderr.write(f"usage: {sys.argv[0]} m n r p q cond damp\n")
+    if len(sys.argv) != 6:
+        sys.stderr.write(f"usage: {sys.argv[0]} A.mtx Aseed.mtx Vtseed.mtx p q")
         sys.stderr.flush()
         sys.exit(1)
 
-    m = int(sys.argv[1])
-    n = int(sys.argv[2])
-    r = int(sys.argv[3])
+    A = mmread(sys.argv[1])
+    Aseed = mmread(sys.argv[2])
+    Vtseed = mmread(sys.argv[3])
     p = int(sys.argv[4])
     q = int(sys.argv[5])
-    cond = float(sys.argv[6])
-    damp = float(sys.argv[7])
-
-    A, U, S, Vt = create_example(m, n, r, p, q, cond, damp)
 
     m, n = A.shape
     b, s = param_check_and_get(m, n, q, p)
-    Acat = []
-    Vtcat = []
 
-    for i in range(b):
-        A1_i, Vt1_i = seed_node(A, i, q, p)
-        Acat.append(A1_i)
-        Vtcat.append(Vt1_i)
+    Ak_2i_0 = Aseed[:,0:p]
+    Ak_2i_1 = Aseed[:,p:2*p]
+    Vtk_2i_0 = Vtseed[:,0:s]
+    Vtk_2i_1 = Vtseed[:,s:2*s]
 
-    Aseed = np.concatenate(Acat, axis=1)
-    Vtseed = np.concatenate(Vtcat, axis=1)
+    Ak1_lj, Vtk1_lj = combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, m, n, 0, 1, q, p)
 
-    mmwrite("A.mtx", A)
-    mmwrite("Aseed.mtx", Aseed)
-    mmwrite("Vtseed.mtx", Vtseed)
+    mmwrite("Ak1_lj.mtx", Ak1_lj)
+    mmwrite("Vtk1_lj.mtx", Vtk1_lj)
 
-    for k in range(1, q):
-        for i in range(2**(q-k)):
-            Ak_2i_0, Ak_2i_1 = Acat[2*i], Acat[2*i+1]
-            Vtk_2i_0, Vtk_2i_1 = Vtcat[2*i], Vtcat[2*i+1]
-            Ak1_lj, Vtk1_lj = combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, m, n, i, k, q, p)
-            if k == 1 and i == 0:
-                mmwrite("Ak1_lj_ref.mtx", Ak1_lj)
-                mmwrite("Vtk1_lj_ref.mtx", Vtk1_lj)
-            Acat[i] = Ak1_lj
-            Vtcat[i] = Vtk1_lj
-
-    Acombs = np.concatenate((Acat[0], Acat[1]), axis=1)
-    Vtcombs = np.concatenate((Vtcat[0], Vtcat[1]), axis=1)
-
-    mmwrite("Acombs.mtx", Acombs)
-    mmwrite("Vtcombs.mtx", Vtcombs)
 
