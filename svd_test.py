@@ -11,7 +11,6 @@ def param_check_and_get(m, n, q, p):
     s = n//b
     assert ispow2(m)
     assert ispow2(n)
-    # assert m >= n
     assert q >= 1
     assert n >= b
     assert s >= p and p >= 1
@@ -135,8 +134,8 @@ def create_example(m, n, r, p, q, cond, damp):
         return Az, Uz, Sz, Vtz
 
 
-m = 512
-n = 4096
+m = 4096
+n = 512
 r = 512
 p = 10
 q = 5
