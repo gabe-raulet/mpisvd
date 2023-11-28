@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     kiss_init();
     iseed_init();
 
-    int m, n, p, q, s, b, d;
+    int m, n, p, q, s, b;
     double *A;
 
     if (argc != 4)
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    mmread(argv[1], &A, &m, &n);
+    A = mmread(argv[1], &m, &n);
 
     assert(!(m&(m-1)) && (n&(n-1))); /* m and n should be powers of 2 */
     assert(m >= n); /* temporary */
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         seed_node(Ai, A1i, Vt1i, m, n, q, p);
     }
 
-    double *Ak_2i_0, *Vtk_2i_0, *Ak_2i_1, *Vtk_2i_1, *Ak1_1j, *Vtk1_lj;
+    double *Ak_2i_0, *Vtk_2i_0, *Ak_2i_1, *Vtk_2i_1, *Ak1_lj, *Vtk1_lj;
 
     for (int k = 1; k < q; ++k)
     {
@@ -76,17 +76,26 @@ int main(int argc, char *argv[])
             Vtk_2i_0 = &Vtcat[(2*i)*p*d];
             Vtk_2i_1 = &Vtcat[(2*i+1)*p*d];
 
-            Ak1_1j = &Acat[i*m*p];
-            Vtk1_1j = &Vtcat[(2*i)*p*d];
+            Ak1_lj = &Acat[i*m*p];
+            Vtk1_lj = &Vtcat[(2*i)*p*d];
 
             combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
         }
     }
 
     double *Aq1_11, *Aq1_12, *Vtq1_11, *Vtq1_12;
-    double **Up, **Sp, **Vtp;
+    double *Up, *Sp, *Vtp;
 
-    extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtqq_12, &Up, &Sp, &Vtp, m, n, q, p);
+    Aq1_11 = &Acat[0];
+    Aq1_12 = &Acat[m*p];
+    Vtq1_11 = &Vtcat[0];
+    Vtq1_12 = &Vtcat[(n*p)>>1];
+
+    extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, &Up, &Sp, &Vtp, m, n, q, p);
+
+    mmwrite("Up_a.mtx", Up, m, p);
+    mmwrite("Vtp_a.mtx", Vtp, p, n);
+    mmwrite_diagonal("Sp_a.mtx", Sp, n);
 
     free(A);
     return 0;

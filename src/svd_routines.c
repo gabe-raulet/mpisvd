@@ -193,4 +193,126 @@ int seed_node(double const *Ai, double *A1i, double *Vt1i, int m, int n, int q, 
     return 0;
 }
 
+int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_12, double **U, double **S, double **Vt, int m, int n, int q, int p)
+{
+    int b = 1 << q;
+    int s = n / b;
+    int d = s * (1 << (q-1));
+
+    assert(2*d == n);
+
+    double *Aq1 = malloc(m*(2*p)*sizeof(double));
+
+    memcpy(&Aq1[0],   Aq1_11, m*p*sizeof(double));
+    memcpy(&Aq1[m*p], Aq1_12, m*p*sizeof(double));
+
+    double *Vhtq1 = calloc((2*p)*(2*d), sizeof(double));
+
+    for (int j = 0; j < d; ++j)
+    {
+        memcpy(&Vhtq1[j*(2*p)], &Vtq1_11[j*p], p*sizeof(double));
+        memcpy(&Vhtq1[(j+d)*(2*p)+p], &Vtq1_12[j*p], p*sizeof(double));
+    }
+
+    double *Uq = malloc(m*p*sizeof(double));
+    double *Sq = malloc(p*sizeof(double));
+    double *Vtq = malloc(p*(2*p)*sizeof(double));
+
+    svds_naive(Aq1, Uq, Sq, Vtq, m, 2*p, p);
+
+    double *USq = Uq;
+
+    for (int j = 0; j < p; ++j)
+        for (int i = 0; i < m; ++i)
+            USq[i + j*m] *= Sq[j];
+
+    free(Sq);
+
+    double *W = malloc(n*p*sizeof(double));
+
+    cblas_dgemm
+    (
+        CblasColMajor, /* all matrices stored column-major */
+           CblasTrans, /* transpose Vhtq1 */
+           CblasTrans, /* transpose Vtq */
+                    n, /* number of rows of W (and Tr(Vhtq1)) */
+                    p, /* number of columns of W (and Tr(Vtq)) */
+                  2*p, /* number of columns of Tr(Vhtq1) (and number of rows of Tr(Vtq)) */
+                  1.0, /* the alpha in "W <- alpha*Tr(Vhtq1)*Tr(Vtq) + beta*W" */
+                Vhtq1, /* Vhtq1 matrix */
+                  2*p, /* leading dimension of Vhtq1 */
+                  Vtq, /* Vtq matrix */
+                    p, /* leading dimension of Vtq */
+                  0.0, /* the beta in "W <- alpha*Tr(Vhtq1)*Tr(Vtq) + beta*W" */
+                    W, /* W matrix */
+                    n  /* leading dimension of W */
+    );
+
+    free(Vtq);
+    free(Vhtq1);
+
+    assert(n >= p);
+    double *tau = malloc(p*sizeof(double));
+
+    LAPACKE_dgeqrf(LAPACK_COL_MAJOR, n, p, W, n, tau);
+    LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', p, W, n);
+
+    cblas_dtrmm
+    (
+        CblasColMajor, /* all matrices stored column-major */
+           CblasRight, /* triangular matrix on the right */
+           CblasUpper, /* Rq is upper triangular */
+         CblasNoTrans, /* don't transpose Rq */
+         CblasNonUnit, /* Rq not necessarily unit triangular */
+                    m, /* number of rows of USq */
+                    p, /* number of columns of USq */
+                  1.0, /* the alpha in Aq := alpha*USq*inv(Rq) */
+                    W, /* inv(Rq) contained in the upper triangular portion of W */
+                  2*d, /* leading dimension of W */
+                  USq, /* USq on entry, Aq on exit */
+                    m  /* leading dimension of USq */
+    );
+
+    LAPACKE_dorgqr(LAPACK_COL_MAJOR, n, p, p, W, n, tau);
+
+    double *Aq = USq;
+    double *Uc = malloc(m*p*sizeof(double));
+    double *Sc = malloc(p*sizeof(double));
+    double *Vtp = malloc(p*n*sizeof(double));
+    double *Vtc = malloc(p*n*sizeof(double));
+
+    svds_naive(Aq, Uc, Sc, Vtp, m, n, p);
+
+    /*
+     * Vtc = Vtp@Qq.T
+     *
+     * Vtp is p-by-n
+     * Qq.T is n-by-p
+     */
+
+    cblas_dgemm
+    (
+        CblasColMajor, /* all matrices stored column-major */
+           CblasTrans, /* transpose A */
+           CblasTrans, /* transpose B */
+                    p, /* number of rows of C */
+                    p, /* number of columns of C */
+                    n, /* number of columns of A */
+                  1.0, /* the alpha in "C <- alpha*op(A)*op(B) + beta*C" */
+                  Vtp, /* A matrix */
+                    p, /* leading dimension of A */
+                    W, /* B matrix */
+                    n, /* leading dimension of B */
+                  0.0, /* beta */
+                  Vtc, /* W matrix */
+                    p  /* leading dimension of C */
+    );
+
+    *U = Uc;
+    *S = Sc;
+    *Vt = Vtc;
+
+    return 0;
+}
+
 

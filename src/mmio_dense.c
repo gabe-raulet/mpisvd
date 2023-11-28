@@ -68,6 +68,35 @@ int mmio_write_dense(FILE *f, double const *A, int m, int n, int row_major)
     return 0;
 }
 
+int mmwrite_diagonal(char const *fname, double const *D, int n)
+{
+    FILE *f;
+    MM_typecode matcode;
+
+    f = fopen(fname, "w");
+
+    mm_initialize_typecode(&matcode);
+    mm_set_matrix(&matcode);
+    mm_set_dense(&matcode);
+    mm_set_real(&matcode);
+    mm_set_general(&matcode);
+
+    mm_write_banner(f, matcode);
+    fprintf(f, "%%\n");
+    mm_write_mtx_array_size(f, n, n);
+
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i)
+        {
+            double v = i != j? 0.0 : D[i];
+            fprintf(f, "%.18e\n", v);
+        }
+
+    fclose(f);
+
+    return 0;
+}
+
 int mmwrite_upper_triangular(char const *fname, double const *A, int n, int lda)
 {
     FILE *f;
