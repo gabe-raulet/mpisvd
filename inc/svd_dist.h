@@ -17,5 +17,7 @@ int generate_svd_dist_test
     MPI_Comm comm  /* communicator */
 );
 
+int svd_dist(const double *Aloc, double **Up, double **Sp, double **Vtp, int m, int n, int p, int root, MPI_Comm comm);
+
 
 #endif

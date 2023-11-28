@@ -37,20 +37,26 @@ int main(int argc, char *argv[])
     int s, q;
     double *A, *Aloc;
 
-    q =  log2i(nprocs);
+    q = log2i(nprocs);
 
     generate_svd_dist_test(&A, &Aloc, &s, m, n, r, cond, damp, 0, MPI_COMM_WORLD);
 
     char fname[1024];
-    snprintf(fname, 1024, "Aloc_%d.mtx", myrank);
-    mmwrite(fname, Aloc, m, s);
 
     if (myrank == 0)
     {
-        mmwrite("A.mtx", A, m, n);
+        snprintf(fname, 1024, "A_%s.mtx", outprefix);
+        mmwrite(fname, A, m, n);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    double *Up, *Sp, *Vtp;
+
+    if (svd_dist(Aloc, &Up, &Sp, &Vtp, m, n, p, 0, MPI_COMM_WORLD) != 0)
+    {
+        MPI_Finalize();
+        return 1;
+    }
+
     MPI_Finalize();
     return 0;
 }
