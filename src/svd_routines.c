@@ -281,7 +281,7 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
     double *Vtp = malloc(p*n*sizeof(double));
     double *Vtc = malloc(p*n*sizeof(double));
 
-    svds_naive(Aq, Uc, Sc, Vtp, m, n, p);
+    svds_naive(Aq, Uc, Sc, Vtp, m, p, p);
 
     /*
      * Vtc = Vtp@Qq.T
