@@ -66,29 +66,35 @@ def create_example(m, n, r, p, q, cond, damp):
     else:
         return Az, Uz, Sz, Vtz
 
-m = 4096
-n = 512
-r = 512
-p = 10
-q = 5
-cond = 100.
-damp = 2.
+if __name__ == "__main__":
+    if len(sys.argv) != 8:
+        sys.stderr.write(f"usage: {sys.argv[0]} m n r p q cond damp\n")
+        sys.stderr.flush()
+        sys.exit(1)
 
-A, U, S, Vt = create_example(m, n, r, p, q, cond, damp)
+    m = int(sys.argv[1])
+    n = int(sys.argv[2])
+    r = int(sys.argv[3])
+    p = int(sys.argv[4])
+    q = int(sys.argv[5])
+    cond = float(sys.argv[6])
+    damp = float(sys.argv[7])
 
-m, n = A.shape
-b, s = param_check_and_get(m, n, q, p)
-Acat = []
-Vtcat = []
+    A, U, S, Vt = create_example(m, n, r, p, q, cond, damp)
 
-for i in range(b):
-    A1_i, Vt1_i = seed_node(A, i, q, p)
-    Acat.append(A1_i)
-    Vtcat.append(Vt1_i)
+    m, n = A.shape
+    b, s = param_check_and_get(m, n, q, p)
+    Acat = []
+    Vtcat = []
 
-Aseed = np.concatenate(Acat, axis=1)
-Vtseed = np.concatenate(Vtcat, axis=1)
+    for i in range(b):
+        A1_i, Vt1_i = seed_node(A, i, q, p)
+        Acat.append(A1_i)
+        Vtcat.append(Vt1_i)
 
-mmwrite("A.mtx", A)
-mmwrite("Aseed.mtx", Aseed)
-mmwrite("Vtseed.mtx", Vtseed)
+    Aseed = np.concatenate(Acat, axis=1)
+    Vtseed = np.concatenate(Vtcat, axis=1)
+
+    mmwrite("A.mtx", A)
+    mmwrite("Aseed.mtx", Aseed)
+    mmwrite("Vtseed.mtx", Vtseed)
