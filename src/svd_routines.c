@@ -155,6 +155,15 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
      * inv(Rki) :: p-by-p :: upper triangular stored in in W
      */
 
+    /*
+     * Aki := B, USki = B, inv(Rki) = A
+     *
+     * B := B*op(A)
+     *
+     * B is m-by-p
+     * A is p-by-p upper triangular stored in array W with lda=m.
+     */
+
     cblas_dtrmm
     (
         CblasColMajor, /* all matrices stored column-major */
@@ -166,12 +175,13 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
                     p, /* number of columns of USki */
                   1.0, /* the alpha in Aki := alpha*USki*inv(Rki) */
                     W, /* inv(Rki) contained in the upper triangular portion of W */
-                    m, /* leading dimension of W */
+                  2*d, /* leading dimension of W */
                  USki, /* USki on entry, Aki on exit */
                     m  /* leading dimension of USki */
     );
 
     LAPACKE_dorgqr(LAPACK_COL_MAJOR, 2*d, p, p, W, 2*d, tau);
+    mmwrite("Qki_a.mtx", W, 2*d, p);
 
     memcpy(Ak1_lj, USki, m*p*sizeof(double));
 
