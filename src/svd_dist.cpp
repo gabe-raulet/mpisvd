@@ -12,8 +12,6 @@
 #include "svd_serial.h"
 #include "svd_routines.h"
 
-extern int log2i(int v);
-
 int generate_svd_dist_test
 (
     double    **A, /* global m-by-n matrix A returned to root */
@@ -44,7 +42,7 @@ int generate_svd_dist_test
 
     int nloc = n / nprocs;
 
-    Apart = malloc(m*nloc*sizeof(double));
+    Apart = (double*) malloc(m*nloc*sizeof(double));
     MPI_Scatter(Aroot, m*nloc, MPI_DOUBLE, Apart, m*nloc, MPI_DOUBLE, root, comm);
 
     *s = nloc;
@@ -67,15 +65,15 @@ int svd_dist(const double *Aloc, double **Up, double **Sp, double **Vtp, int m, 
 
     double *A1i, *Vt1i;
 
-    A1i = malloc(m*s*sizeof(double));
-    Vt1i = malloc(s*p*sizeof(double));
+    A1i = (double*) malloc(m*s*sizeof(double));
+    Vt1i = (double*) malloc(s*p*sizeof(double));
 
     int q = log2i(nprocs);
 
     seed_node(Aloc, A1i, Vt1i, m, n, q, p);
 
-    double *Amem = malloc(2*m*p*sizeof(double));
-    double *Vtmem = malloc(n*p*sizeof(double)); /* this should be allocated with less memory depending on what myrank is */
+    double *Amem = (double*) malloc(2*m*p*sizeof(double));
+    double *Vtmem = (double*) malloc(n*p*sizeof(double)); /* this should be allocated with less memory depending on what myrank is */
 
     if (myrank % 2 != 0)
     {

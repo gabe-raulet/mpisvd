@@ -23,8 +23,8 @@ int main(int argc, char *argv[])
     int n = 128;
     int r = 64;
 
-    double *A = malloc(m*n*sizeof(double));
-    double *S = calloc(n, sizeof(double));
+    double *A = (double*) malloc(m*n*sizeof(double));
+    double *S = (double*) calloc(n, sizeof(double));
 
     S[0] = 100.;
     for (int i = 1; i < r; ++i) S[i] = S[i-1]/2.;

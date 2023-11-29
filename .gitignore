@@ -2,5 +2,5 @@ full_svd
 mpi_svd
 *.mtx
 *.diag
-fmisvd/build
-fmisvd/fmi
+build
+fmi

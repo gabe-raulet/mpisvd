@@ -11,7 +11,7 @@ add_subdirectory(./fmi)
 include_directories(./inc ${FMI_INCLUDE_DIRS} /opt/homebrew/Cellar/openblas/0.3.24/include /opt/homebrew/include)
 
 add_library(lib_fmi_svd src/svd_fmi.cpp src/fmi_wrapper.cpp src/kiss.cpp src/mmio_dense.cpp 
-            src/mmio.cpp src/svd_routines.cpp)
+            src/mmio.cpp src/svd_routines.cpp src/svd_serial.cpp)
 
 link_libraries(lib_fmi_svd)
 

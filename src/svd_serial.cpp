@@ -55,8 +55,8 @@ int generate_svd_test(double **A_ref, int m, int n, int r, double cond, double d
         return -1;
     }
 
-    double *A = malloc(m*n*sizeof(double));
-    double *S = calloc(n, sizeof(double));
+    double *A = (double*) malloc(m*n*sizeof(double));
+    double *S = (double*) calloc(n, sizeof(double));
 
     S[0] = cond;
     for (int i = 1; i < r; ++i) S[i] = S[i-1] / damp;
@@ -118,8 +118,8 @@ int svd_serial
         return -1;
     }
 
-    double *Acat = malloc(m*p*b*sizeof(double));
-    double *Vtcat = malloc(p*s*b*sizeof(double)); /* note: s*b == n */
+    double *Acat = (double*) malloc(m*p*b*sizeof(double));
+    double *Vtcat = (double*) malloc(p*s*b*sizeof(double)); /* note: s*b == n */
 
     double const *Ai;
     double *A1i, *Vt1i;

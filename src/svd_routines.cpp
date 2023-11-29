@@ -16,10 +16,10 @@ int svds_naive(const double *A, double *Up, double *Sp, double *Vpt, int m, int 
     double *S, *U, *Vt, *work, *Acast = (double *)A;
     int drank = m < n? m : n;
 
-    work = malloc(5*drank*sizeof(double));
-    S = malloc(drank*sizeof(double));
-    U = malloc(m*drank*sizeof(double));
-    Vt = malloc(drank*n*sizeof(double));
+    work = (double*) malloc(5*drank*sizeof(double));
+    S = (double*) malloc(drank*sizeof(double));
+    U = (double*) malloc(m*drank*sizeof(double));
+    Vt = (double*) malloc(drank*n*sizeof(double));
 
     LAPACKE_dgesvd
     (
@@ -65,12 +65,12 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
     int s = n / b;
     int d = (1 << (k-1)) * s;
 
-    double *Aki = malloc(m*(2*p)*sizeof(double));
+    double *Aki = (double*) malloc(m*(2*p)*sizeof(double));
 
     memcpy(&Aki[0],   Ak_2i_0, m*p*sizeof(double));
     memcpy(&Aki[m*p], Ak_2i_1, m*p*sizeof(double));
 
-    double *Vhtki = calloc((2*p)*(2*d), sizeof(double));
+    double *Vhtki = (double*) calloc((2*p)*(2*d), sizeof(double));
 
     for (int j = 0; j < d; ++j)
     {
@@ -78,9 +78,9 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
         memcpy(&Vhtki[(j+d)*(2*p)+p], &Vtk_2i_1[j*p], p*sizeof(double));
     }
 
-    double *Uki = malloc(m*p*sizeof(double));
-    double *Ski = malloc(p*sizeof(double));
-    double *Vtki = malloc(p*(2*p)*sizeof(double));
+    double *Uki = (double*) malloc(m*p*sizeof(double));
+    double *Ski = (double*) malloc(p*sizeof(double));
+    double *Vtki = (double*) malloc(p*(2*p)*sizeof(double));
 
     svds_naive(Aki, Uki, Ski, Vtki, m, 2*p, p);
 
@@ -104,7 +104,7 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
      * Tr(Vtki) :: 2p-by-p
      */
 
-    double *W = malloc((2*d)*p*sizeof(double));
+    double *W = (double*) malloc((2*d)*p*sizeof(double));
 
     cblas_dgemm
     (
@@ -136,7 +136,7 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
      */
 
     assert(2*d >= p);
-    double *tau = malloc(p*sizeof(double));
+    double *tau = (double*) malloc(p*sizeof(double));
 
 
     LAPACKE_dgeqrf(LAPACK_COL_MAJOR, 2*d, p, W, 2*d, tau);
@@ -198,7 +198,7 @@ int seed_node(double const *Ai, double *A1i, double *Vt1i, int m, int n, int q, 
     int b = 1 << q;
     int s = n / b;
 
-    double *Sp = malloc(p*sizeof(double));
+    double *Sp = (double*) malloc(p*sizeof(double));
 
     svds_naive(Ai, A1i, Sp, Vt1i, m, s, p);
 
@@ -222,12 +222,12 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
 
     assert(2*d == n);
 
-    double *Aq1 = malloc(m*(2*p)*sizeof(double));
+    double *Aq1 = (double*) malloc(m*(2*p)*sizeof(double));
 
     memcpy(&Aq1[0],   Aq1_11, m*p*sizeof(double));
     memcpy(&Aq1[m*p], Aq1_12, m*p*sizeof(double));
 
-    double *Vhtq1 = calloc((2*p)*(2*d), sizeof(double));
+    double *Vhtq1 = (double*) calloc((2*p)*(2*d), sizeof(double));
 
     for (int j = 0; j < d; ++j)
     {
@@ -235,9 +235,9 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
         memcpy(&Vhtq1[(j+d)*(2*p)+p], &Vtq1_12[j*p], p*sizeof(double));
     }
 
-    double *Uq = malloc(m*p*sizeof(double));
-    double *Sq = malloc(p*sizeof(double));
-    double *Vtq = malloc(p*(2*p)*sizeof(double));
+    double *Uq = (double*) malloc(m*p*sizeof(double));
+    double *Sq = (double*) malloc(p*sizeof(double));
+    double *Vtq = (double*) malloc(p*(2*p)*sizeof(double));
 
     svds_naive(Aq1, Uq, Sq, Vtq, m, 2*p, p);
 
@@ -249,7 +249,7 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
 
     free(Sq);
 
-    double *W = malloc(n*p*sizeof(double));
+    double *W = (double*) malloc(n*p*sizeof(double));
 
     cblas_dgemm
     (
@@ -273,7 +273,7 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
     free(Vhtq1);
 
     assert(n >= p);
-    double *tau = malloc(p*sizeof(double));
+    double *tau = (double*) malloc(p*sizeof(double));
 
     LAPACKE_dgeqrf(LAPACK_COL_MAJOR, n, p, W, n, tau);
     LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', p, W, n);
@@ -298,10 +298,10 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
 
     double *Aq = USq;
     double *Qq = W;
-    double *Uc = malloc(m*p*sizeof(double));
-    double *Sc = malloc(p*sizeof(double));
-    double *Vtp = malloc(p*n*sizeof(double));
-    double *Vtc = malloc(p*n*sizeof(double));
+    double *Uc = (double*) malloc(m*p*sizeof(double));
+    double *Sc = (double*) malloc(p*sizeof(double));
+    double *Vtp = (double*) malloc(p*n*sizeof(double));
+    double *Vtc = (double*) malloc(p*n*sizeof(double));
 
     svds_naive(Aq, Uc, Sc, Vtp, m, p, p);
 

@@ -1,11 +1,11 @@
 CC=clang
-MPICC=mpicc
+MPICC=mpiCC
 INCS=-I/opt/homebrew/Cellar/openblas/0.3.24/include -I/opt/homebrew/include -I./inc
 LIBS=-L/opt/homebrew/Cellar/lapack/3.12.0/lib -L/opt/homebrew/Cellar/openblas/0.3.24/lib
-LINKS=-llapacke -lopenblas
+LINKS=-llapacke -lopenblas -lstdc++
 OBJS=kiss.o mmio.o mmio_dense.o svd_routines.o svd_serial.o svd_dist.o
 PROGS=full_svd mpi_svd
-CFLAGS=-Wall
+CFLAGS=-Wall -std=c++17
 
 D?=0
 
@@ -15,8 +15,8 @@ else
 CFLAGS+=-O2
 endif
 
-%.o: src/%.c
-	$(CC) $(CFLAGS) $(INCS) -c -o $@ $<
+%.o: src/%.cpp
+	$(MPICC) $(CFLAGS) $(INCS) -c -o $@ $<
 
 all: $(PROGS)
 	rm -rf *.o
@@ -24,10 +24,10 @@ all: $(PROGS)
 test: full_svd
 	python run_serial_tests.py
 
-full_svd: full_svd.c $(OBJS)
+full_svd: full_svd.cpp $(OBJS)
 	$(MPICC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
 
-mpi_svd: mpi_svd.c $(OBJS)
+mpi_svd: mpi_svd.cpp $(OBJS)
 	$(MPICC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
 
 clean:

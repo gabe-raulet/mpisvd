@@ -1,6 +1,8 @@
 #ifndef SVD_SERIAL_H_
 #define SVD_SERIAL_H_
 
+int log2i(int v);
+
 /*
  * Computes an approximate p-truncated SVD A = Up*Sp*Vtp.
  */
