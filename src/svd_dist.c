@@ -74,68 +74,84 @@ int svd_dist(const double *Aloc, double **Up, double **Sp, double **Vtp, int m, 
 
     seed_node(Aloc, A1i, Vt1i, m, n, q, p);
 
-    /*char fname[1024];*/
-    /*snprintf(fname, 1024, "A1%d.mtx", myrank);*/
-    /*mmwrite(fname, A1i, m, s);*/
-    /*snprintf(fname, 1024, "Vt1%d.mtx", myrank);*/
-    /*mmwrite(fname, Vt1i, s, p);*/
+    double *Amem = malloc(2*m*p*sizeof(double));
+    double *Vtmem = malloc(n*p*sizeof(double)); /* this should be allocated with less memory depending on what myrank is */
 
-    /*
-     * A1i is m-by-p
-     * Vt1i is p-by-s
-     */
+    if (myrank % 2 != 0)
+    {
+        MPI_Send(A1i, m*p, MPI_DOUBLE, myrank-1, myrank, comm);
+        MPI_Send(Vt1i, p*s, MPI_DOUBLE, myrank-1, myrank+nprocs, comm);
+    }
+    else
+    {
+        memcpy(Amem, A1i, m*p*sizeof(double));
+        memcpy(Vtmem, Vt1i, p*s*sizeof(double));
+        MPI_Recv(&Amem[m*p], m*p, MPI_DOUBLE, myrank+1, myrank+1, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(&Vtmem[p*s], p*s, MPI_DOUBLE, myrank+1, myrank+1+nprocs, comm, MPI_STATUS_IGNORE);
+    }
 
-    double *Arecv = malloc(2*m*p*sizeof(double));
-    double *Vtrecv = malloc(n*p*sizeof(double)); /* this should be allocated with less memory depending on what myrank is */
+    double *Ak_2i_0, *Vtk_2i_0, *Ak_2i_1, *Vtk_2i_1, *Ak1_lj, *Vtk1_lj;
 
-    /* receive from seeds */
+    for (int k = 1; k < q; ++k)
+    {
+        int c = 1 << (q-k); /* nodes on this level */
+        int d = s * (1 << (k-1)); /* column count of incoming Vtk_2i_j matrices */
 
-    //if (myrank % 2 != 0)
-    //{
-    //    MPI_Send(A1i, m*s, MPI_DOUBLE, myrank-1, myrank, comm);
-    //    MPI_Send(Vt1i, s*p, MPI_DOUBLE, myrank-1, myrank+nprocs, comm);
-    //}
-    //else
-    //{
-    //    memcpy(Arecv, A1i, m*s*sizeof(double));
-    //    memcpy(Vtrecv, Vt1i, s*p*sizeof(double));
-    //    MPI_Recv(&Arecv[m*s], m*s, MPI_DOUBLE, myrank+1, myrank+1, comm);
-    //    MPI_Recv(&Vtrecv[s*p], s*p, MPI_DOUBLE, myrank+1, myrank+1+nprocs, comm);
-    //}
+        Ak_2i_0 = &Amem[0]; /* m-by-p */
+        Ak_2i_1 = &Amem[m*p]; /* m-by-p */
+        Vtk_2i_0 = &Vtmem[0]; /* p-by-d */
+        Vtk_2i_1 = &Vtmem[p*d]; /* p-by-d */
 
-    //double *Ak_2i_0, *Vtk_2i_0, *Ak_2i_1, *Vtk_2i_1, *Ak1_lj, *Vtk1_lj;
+        Ak1_lj = &Amem[0]; /* m-by-p on exit */
+        Vtk1_lj = &Vtmem[0]; /* p-by-2d on exit */
 
-    //for (int k = 1; k < q; ++k)
-    //{
-    //    int c = 1 << (q-k); /* nodes on this level */
-    //    int d = s * (1 << (k-1)); /* column count of incoming Vtk_2i_j matrices */
+        combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
 
-    //    Ak_2i_0 = &Arecv[0];
-    //    Ak_2i_1 = &Arecv[m*p];
-    //    Vtk_2i_0 = &Vtrecv[0];
-    //    Vtk_2i_1 = &Vtrecv[p*d];
+        /* MPI_Recv(buf, count, dtype, source, tag, comm) */
+        /* MPI_Send(buf, count, dtype, dest, tag, comm) */
 
-    //    Ak1_lj = &Arecv[0];
-    //    Vtk1_lj = &Vtrecv[]
+        if ((myrank % (1 << (k+1))) == (1 << k))
+        {
 
+            int dest = myrank - (1 << k);
+            int Atag = myrank;
+            int Vtag = myrank + nprocs;
 
-    //    //for (int i = 0; i < c; ++i)
-    //    //{
-    //    //    Ak_2i_0 = &Acat[(2*i)*m*p];
-    //    //    Ak_2i_1 = &Acat[(2*i+1)*m*p];
-    //    //    Vtk_2i_0 = &Vtcat[(2*i)*p*d];
-    //    //    Vtk_2i_1 = &Vtcat[(2*i+1)*p*d];
+            /*printf("k=%d: rank %d sending %d doubles to rank %d with tag %d\n", k, myrank, m*p, dest, Atag);*/
+            /*printf("k=%d: rank %d sending %d doubles to rank %d with tag %d\n", k, myrank, p*2*d, dest, Vtag);*/
 
-    //    //    Ak1_lj = &Acat[i*m*p];
-    //    //    Vtk1_lj = &Vtcat[(2*i)*p*d];
+            MPI_Send(Ak1_lj, m*p, MPI_DOUBLE, dest, Atag, comm);
+            MPI_Send(Vtk1_lj, p*2*d, MPI_DOUBLE, dest, Vtag, comm);
+        }
+        else if ((myrank % (1 << (k+1))) == 0)
+        {
 
-    //    //    combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
-    //    //}
-    //}
+            int source = myrank + (1 << k);
+            int Atag = myrank + (1 << k);
+            int Vtag = myrank + (1 << k) + nprocs;
+
+            MPI_Recv(&Amem[m*p], m*p, MPI_DOUBLE, source, Atag, comm, MPI_STATUS_IGNORE);
+            MPI_Recv(&Vtmem[p*2*d], p*2*d, MPI_DOUBLE, source, Vtag, comm, MPI_STATUS_IGNORE);
+
+            /*printf("k=%d: rank %d received %d doubles from rank %d with tag %d\n", k, myrank, m*p, source, Atag);*/
+            /*printf("k=%d: rank %d received %d doubles from rank %d with tag %d\n", k, myrank, p*2*d, source, Vtag);*/
+        }
+
+    }
+
+    MPI_Barrier(comm);
+
+    double *Aq1_11, *Aq1_12, *Vtq1_11, *Vtq1_12;
+
+    Aq1_11 = &Amem[0];
+    Aq1_12 = &Amem[m*p];
+    Vtq1_11 = &Vtmem[0];
+    Vtq1_12 = &Vtmem[(n*p)>>1];
+
+    extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, Up, Sp, Vtp, m, n, q, p);
 
     free(A1i);
     free(Vt1i);
-    MPI_Barrier(comm);
     return 0;
 }
 

@@ -63,11 +63,24 @@ def read_diag(fname):
     nums = [float(line.rstrip()) for line in open(fname, "r")]
     return np.array(nums, dtype=np.double)
 
-def run_test(test_params, cnt):
+def run_test(test_params, cnt, dist=False):
     m, n, p, q, r, cond, damp = test_params
     sys.stderr.write(f"test({cnt})[m={m}, n={n}, p={p}, b={2**q}, cond={cond}, damp={damp}]\n")
     sys.stderr.flush()
-    cmd = ["./full_svd", f"test{cnt}"] + [str(tok) for tok in [m,n,p,q,r]] + [str(tok) for tok in [cond, damp]]
+
+    toks = []
+    cmd = []
+
+    if dist:
+        cmd += ["mpirun", "-np", str(1<<q), "--oversubscribe", "./mpi_svd", f"test{cnt}1"]
+        toks += [m,n,p,r]
+    else:
+        cmd += ["./full_svd", f"test{cnt}0"]
+        toks += [m,n,p,q,r]
+
+    toks += [cond, damp]
+    cmd += [str(tok) for tok in toks]
+
     sys.stderr.write(" ".join(cmd) + "\n")
     sys.stderr.flush()
     proc = sp.Popen(cmd, stdout=sp.PIPE)
@@ -78,10 +91,10 @@ def run_test(test_params, cnt):
         sys.stdout.flush()
         return
 
-    A = mmread(f"A_test{cnt}.mtx")
-    Up = mmread(f"Up_test{cnt}.mtx")
-    Sp = read_diag(f"Sp_test{cnt}.diag")
-    Vtp = mmread(f"Vtp_test{cnt}.mtx")
+    A = mmread(f"A_test{cnt}{int(dist)}.mtx")
+    Up = mmread(f"Up_test{cnt}{int(dist)}.mtx")
+    Sp = read_diag(f"Sp_test{cnt}{int(dist)}.diag")
+    Vtp = mmread(f"Vtp_test{cnt}{int(dist)}.mtx")
 
     Ap = Up@np.diag(Sp)@Vtp
 
@@ -102,8 +115,9 @@ def run_test(test_params, cnt):
 if __name__  == "__main__":
 
     # tests = create_test_parameters(colexps=[7,8,9], scalexps=[1], ranktests=1, pvals=[10], qvals=[3])
-    # tests = create_test_parameters(colexps=[8,10], scalexps=[0,1], ranktests=2, pvals=[10], qvals=[3,5])
-    tests = create_test_parameters(colexps=[8], scalexps=[0], ranktests=2, pvals=[10], qvals=[3,5])
+    tests = create_test_parameters(colexps=[8,10], scalexps=[0,1], ranktests=2, pvals=[10], qvals=[3,5])
+    # tests = create_test_parameters(colexps=[8], scalexps=[0], ranktests=2, pvals=[10], qvals=[3,4])
 
     for cnt, test in enumerate(tests):
-        run_test(test, cnt)
+        # run_test(test, cnt, dist=False)
+        run_test(test, cnt, dist=True)

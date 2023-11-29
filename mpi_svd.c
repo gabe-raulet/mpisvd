@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
     {
         snprintf(fname, 1024, "A_%s.mtx", outprefix);
         mmwrite(fname, A, m, n);
+        free(A);
     }
 
     double *Up, *Sp, *Vtp;
@@ -55,6 +56,22 @@ int main(int argc, char *argv[])
     {
         MPI_Finalize();
         return 1;
+    }
+
+    if (!myrank)
+    {
+        snprintf(fname, 1024, "Up_%s.mtx", outprefix);
+        mmwrite(fname, Up, m, p);
+
+        snprintf(fname, 1024, "Vtp_%s.mtx", outprefix);
+        mmwrite(fname, Vtp, p, n);
+
+        snprintf(fname, 1024, "Sp_%s.diag", outprefix);
+        write_diag(fname, Sp, p);
+
+        free(Up);
+        free(Sp);
+        free(Vtp);
     }
 
     MPI_Finalize();
