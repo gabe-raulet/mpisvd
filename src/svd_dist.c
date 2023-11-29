@@ -10,6 +10,9 @@
 #include "mmio_dense.h"
 #include "svd_dist.h"
 #include "svd_serial.h"
+#include "svd_routines.h"
+
+extern int log2i(int v);
 
 int generate_svd_dist_test
 (
@@ -61,105 +64,78 @@ int svd_dist(const double *Aloc, double **Up, double **Sp, double **Vtp, int m, 
     assert(n % nprocs == 0);
 
     int s = n / nprocs;
+
+    double *A1i, *Vt1i;
+
+    A1i = malloc(m*s*sizeof(double));
+    Vt1i = malloc(s*p*sizeof(double));
+
+    int q = log2i(nprocs);
+
+    seed_node(Aloc, A1i, Vt1i, m, n, q, p);
+
+    /*char fname[1024];*/
+    /*snprintf(fname, 1024, "A1%d.mtx", myrank);*/
+    /*mmwrite(fname, A1i, m, s);*/
+    /*snprintf(fname, 1024, "Vt1%d.mtx", myrank);*/
+    /*mmwrite(fname, Vt1i, s, p);*/
+
+    /*
+     * A1i is m-by-p
+     * Vt1i is p-by-s
+     */
+
+    double *Arecv = malloc(2*m*p*sizeof(double));
+    double *Vtrecv = malloc(n*p*sizeof(double)); /* this should be allocated with less memory depending on what myrank is */
+
+    /* receive from seeds */
+
+    //if (myrank % 2 != 0)
+    //{
+    //    MPI_Send(A1i, m*s, MPI_DOUBLE, myrank-1, myrank, comm);
+    //    MPI_Send(Vt1i, s*p, MPI_DOUBLE, myrank-1, myrank+nprocs, comm);
+    //}
+    //else
+    //{
+    //    memcpy(Arecv, A1i, m*s*sizeof(double));
+    //    memcpy(Vtrecv, Vt1i, s*p*sizeof(double));
+    //    MPI_Recv(&Arecv[m*s], m*s, MPI_DOUBLE, myrank+1, myrank+1, comm);
+    //    MPI_Recv(&Vtrecv[s*p], s*p, MPI_DOUBLE, myrank+1, myrank+1+nprocs, comm);
+    //}
+
+    //double *Ak_2i_0, *Vtk_2i_0, *Ak_2i_1, *Vtk_2i_1, *Ak1_lj, *Vtk1_lj;
+
+    //for (int k = 1; k < q; ++k)
+    //{
+    //    int c = 1 << (q-k); /* nodes on this level */
+    //    int d = s * (1 << (k-1)); /* column count of incoming Vtk_2i_j matrices */
+
+    //    Ak_2i_0 = &Arecv[0];
+    //    Ak_2i_1 = &Arecv[m*p];
+    //    Vtk_2i_0 = &Vtrecv[0];
+    //    Vtk_2i_1 = &Vtrecv[p*d];
+
+    //    Ak1_lj = &Arecv[0];
+    //    Vtk1_lj = &Vtrecv[]
+
+
+    //    //for (int i = 0; i < c; ++i)
+    //    //{
+    //    //    Ak_2i_0 = &Acat[(2*i)*m*p];
+    //    //    Ak_2i_1 = &Acat[(2*i+1)*m*p];
+    //    //    Vtk_2i_0 = &Vtcat[(2*i)*p*d];
+    //    //    Vtk_2i_1 = &Vtcat[(2*i+1)*p*d];
+
+    //    //    Ak1_lj = &Acat[i*m*p];
+    //    //    Vtk1_lj = &Vtcat[(2*i)*p*d];
+
+    //    //    combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
+    //    //}
+    //}
+
+    free(A1i);
+    free(Vt1i);
+    MPI_Barrier(comm);
+    return 0;
 }
 
-///*
-// * Computes an approximate p-truncated SVD A = Up*Sp*Vtp.
-// */
-//int svd_serial
-//(
-//    double const *A, /* input m-by-n matrx */
-//    double **Up, /* output m-by-p matrix */
-//    double **Sp, /* output p-by-p diagonal matrix */
-//    double **Vtp, /* output p-by-n matrix */
-//    int m, /* rows of A */
-//    int n, /* columns of A */
-//    int p, /* rank approximation */
-//    int b /* number of seed nodes in binary topology */
-//)
-//{
-//    if (!A || !Up || !Sp || !Vtp)
-//    {
-//        fprintf(stderr, "[error] svd_serial: invalid arguments\n");
-//        return -1;
-//    }
-//
-//    if (m < n || n <= 0 || p > n || b <= 0)
-//    {
-//        fprintf(stderr, "[error] svd_serial: must have 1 <= p <= n <= m and b >= 1.\n[note]: support for m < n would be nice at some point\n");
-//        return -1;
-//    }
-//
-//    if ((m&(m-1)) || (n&(n-1)) || ((b&(b-1))))
-//    {
-//        fprintf(stderr, "[error] svd_serial: currently only works with m, n, and b being powers of 2\n");
-//        return -1;
-//    }
-//
-//    if (b >= n || n % b != 0)
-//    {
-//        fprintf(stderr, "[error] svd_serial: because of even column-splitting requirement, it is necessary that n %% b == 0 and n > b\n");
-//        return -1;
-//    }
-//
-//    int q = log2i(b);
-//    assert(q >= 1);
-//
-//    int s = n / b;
-//
-//    if (s <= p)
-//    {
-//        fprintf(stderr, "[error] svd_serial: trying to compute %d-truncated SVD with s=%d\n", p, s);
-//        return -1;
-//    }
-//
-//    double *Acat = malloc(m*p*b*sizeof(double));
-//    double *Vtcat = malloc(p*s*b*sizeof(double)); /* note: s*b == n */
-//
-//    double const *Ai;
-//    double *A1i, *Vt1i;
-//
-//    for (int i = 0; i < b; ++i)
-//    {
-//        Ai = &A[i*m*s];
-//        A1i = &Acat[i*m*p];
-//        Vt1i = &Vtcat[i*p*s];
-//
-//        seed_node(Ai, A1i, Vt1i, m, n, q, p);
-//    }
-//
-//    double *Ak_2i_0, *Vtk_2i_0, *Ak_2i_1, *Vtk_2i_1, *Ak1_lj, *Vtk1_lj;
-//
-//    for (int k = 1; k < q; ++k)
-//    {
-//        int c = 1 << (q-k); /* nodes on this level */
-//        int d = s * (1 << (k-1)); /* column count of incoming Vtk_2i_j matrices */
-//
-//        for (int i = 0; i < c; ++i)
-//        {
-//            Ak_2i_0 = &Acat[(2*i)*m*p];
-//            Ak_2i_1 = &Acat[(2*i+1)*m*p];
-//            Vtk_2i_0 = &Vtcat[(2*i)*p*d];
-//            Vtk_2i_1 = &Vtcat[(2*i+1)*p*d];
-//
-//            Ak1_lj = &Acat[i*m*p];
-//            Vtk1_lj = &Vtcat[(2*i)*p*d];
-//
-//            combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
-//        }
-//    }
-//
-//    double *Aq1_11, *Aq1_12, *Vtq1_11, *Vtq1_12;
-//
-//    Aq1_11 = &Acat[0];
-//    Aq1_12 = &Acat[m*p];
-//    Vtq1_11 = &Vtcat[0];
-//    Vtq1_12 = &Vtcat[(n*p)>>1];
-//
-//    extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, Up, Sp, Vtp, m, n, q, p);
-//
-//    free(Acat);
-//    free(Vtcat);
-//
-//    return 0;
-//}
