@@ -94,7 +94,6 @@ int svd_dist(const double *Aloc, double **Up, double **Sp, double **Vtp, int m, 
 
     for (int k = 1; k < q; ++k)
     {
-        int c = 1 << (q-k); /* nodes on this level */
         int d = s * (1 << (k-1)); /* column count of incoming Vtk_2i_j matrices */
 
         Ak_2i_0 = &Amem[0]; /* m-by-p */

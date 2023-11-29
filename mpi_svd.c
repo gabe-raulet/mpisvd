@@ -34,10 +34,8 @@ int main(int argc, char *argv[])
     double cond = atof(argv[6]);
     double damp = atof(argv[7]);
 
-    int s, q;
+    int s;
     double *A, *Aloc;
-
-    q = log2i(nprocs);
 
     generate_svd_dist_test(&A, &Aloc, &s, m, n, r, cond, damp, 0, MPI_COMM_WORLD);
 
