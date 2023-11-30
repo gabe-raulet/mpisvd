@@ -24,6 +24,8 @@ int params_init(params_t *ps);
 int parse_params(int argc, char *argv[], params_t *ps);
 int usage(char *argv[], const params_t *ps);
 int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, double dmax);
+int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n);
+double l2dist(const double *x, const double *y, int n);
 
 int main(int argc, char *argv[])
 {
@@ -53,8 +55,13 @@ int main(int argc, char *argv[])
 
     gen_test_mat(A, S, m, n, mode, cond, dmax);
 
-    mmwrite("A.mtx", A, m, n);
-    mmwrite_diagonal("S.mtx", S, n);
+    double *Scheck = malloc(n*sizeof(double));
+    double *U = malloc(m*n*sizeof(double));
+    double *Vt = malloc(n*n*sizeof(double));
+
+    gen_uv_mats(A, Scheck, U, Vt, m, n);
+
+    fprintf(stderr, "[main] l2-distance between DLATMS and DGESVD singular values = %.18e\n", l2dist(S, Scheck, n));
 
     free(A);
     free(S);
@@ -113,6 +120,7 @@ int usage(char *argv[], const params_t *ps)
     fprintf(stderr, "         -c FLOAT  DLATMS cond or condition number [%.3e]\n", ps->cond);
     fprintf(stderr, "         -d FLOAT  DLATMS dmax or damping factor [%.3e]\n", ps->dmax);
     fprintf(stderr, "         -s INT    RNG seed [%d]\n", ps->seed);
+    fprintf(stderr, "         -S FILE   output singular values file\n");
     fprintf(stderr, "         -h        help message\n");
     return 1;
 }
@@ -199,9 +207,27 @@ int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, doub
 
         mode = 0;
     }
+    else
+    {
+        assert(1 <= mode && mode <= 5);
+    }
 
-    LAPACKE_dlatms(LAPACK_COL_MAJOR, m, n, 'U', iseed, 'N', S, 0, 0., 0., m, n, 'N', A, m);
+    LAPACKE_dlatms(LAPACK_COL_MAJOR, m, n, 'U', iseed, 'N', S, mode, cond, dmax, m, n, 'N', A, m);
 
     return 0;
 }
 
+int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n)
+{
+    double *Al = malloc(m*n*sizeof(double));
+    double *work = malloc(5*n*sizeof(double));
+
+    memcpy(Al, A, m*n*sizeof(double));
+
+    LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', m, n, Al, m, S, U, m, Vt, n, work);
+
+    free(Al);
+    free(work);
+
+    return 0;
+}
