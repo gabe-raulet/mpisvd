@@ -4,7 +4,7 @@ INCS=-I/opt/homebrew/Cellar/openblas/0.3.24/include -I/opt/homebrew/include -I./
 LIBS=-L/opt/homebrew/Cellar/lapack/3.12.0/lib -L/opt/homebrew/Cellar/openblas/0.3.24/lib
 LINKS=-llapacke -lopenblas
 OBJS=kiss.o mmio.o mmio_dense.o svd_routines.o
-PROGS=serial_svd dist_svd
+PROGS=serial_svd
 CFLAGS=-Wall
 
 D?=0

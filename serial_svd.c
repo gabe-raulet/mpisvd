@@ -11,7 +11,7 @@
 #include "mmio_dense.h"
 #include "svd_routines.h"
 
-typedef struct { int m, n, p, b, mode, seed; double cond, dmax; } params_t;
+typedef struct { int m, n, p, b, mode, seed, fast; double cond, dmax; } params_t;
 
 int iseed[4];
 int iseed_init();
@@ -23,9 +23,9 @@ int params_init(params_t *ps);
 int parse_params(int argc, char *argv[], params_t *ps);
 int usage(char *argv[], const params_t *ps);
 int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, double dmax);
-int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n);
+int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n, int fast);
 double l2dist(const double *x, const double *y, int n);
-int compute_errors(const double *A, const double *U, const double *Up, const double *S, const double *Sp, const double *Vt, const double *Vtp, int m, int n, int p, double errs[4]);
+int compute_errors(const double *A, const double *U, const double *Up, const double *S, const double *Sp, const double *Vt, const double *Vtp, int m, int n, int p, double errs[4], int fast);
 int svd_serial(double const *A, double *Up, double *Sp, double *Vtp, int m, int n, int p, int b);
 double get_clock_telapsed(struct timespec start, struct timespec end);
 
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
     iseed_init();
 
-    int m=params.m, n=params.n, p=params.p, b=params.b, mode=params.mode;
+    int m=params.m, n=params.n, p=params.p, b=params.b, mode=params.mode, fast=params.fast;
     double cond=params.cond, dmax=params.dmax;
 
     if (svdgen_param_check(m, n, mode, cond, dmax))
@@ -62,10 +62,10 @@ int main(int argc, char *argv[])
     gen_test_mat(A, S, m, n, mode, cond, dmax);
 
     double *Scheck = malloc(n*sizeof(double));
-    double *U = malloc(m*n*sizeof(double));
-    double *Vt = malloc(n*n*sizeof(double));
+    double *U = fast? NULL : malloc(m*n*sizeof(double));
+    double *Vt = fast? NULL : malloc(n*n*sizeof(double));
 
-    gen_uv_mats(A, Scheck, U, Vt, m, n);
+    gen_uv_mats(A, Scheck, U, Vt, m, n, fast);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     gentime = get_clock_telapsed(start, end);
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    compute_errors(A, U, Up, S, Sp, Vt, Vtp, m, n, p, errs);
+    compute_errors(A, U, Up, S, Sp, Vt, Vtp, m, n, p, errs, fast);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     errtime = get_clock_telapsed(start, end);
@@ -103,8 +103,12 @@ int main(int argc, char *argv[])
     fprintf(stderr, "[main:compute_errors::%.5f(s)]\n", errtime);
     fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [A :: test matrix]\n", errs[0]);
     fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [S :: singular values]\n", errs[1]);
-    fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [U :: singular vectors (left)]\n", errs[2]);
-    fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [V :: singular vectors (right)]\n", errs[3]);
+
+    if (!fast)
+    {
+        fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [U :: singular vectors (left)]\n", errs[2]);
+        fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [V :: singular vectors (right)]\n", errs[3]);
+    }
 
     free(A);
     free(S);
@@ -122,7 +126,7 @@ int compute_errors(const double *A,
                    const double *S, const double *Sp,
                    const double *Vt, const double *Vtp,
                    int m, int n, int p,
-                   double errs[4])
+                   double errs[4], int fast)
 {
     double Aerr, Serr, Uerr, Verr;
     double *mem = malloc(m*m*sizeof(double));
@@ -144,45 +148,50 @@ int compute_errors(const double *A,
 
     Serr = l2dist(S, Sp, p);
 
-    /*M = U@U.T - Up@Up.T m-by-m */
+    if (!fast)
+    {
+        /*M = U@U.T - Up@Up.T m-by-m */
 
-    for (int j = 0; j < m; ++j)
-        for (int i = 0; i < m; ++i)
-        {
-            double acc = 0;
-
-            for (int k = 0; k < p; ++k)
+        for (int j = 0; j < m; ++j)
+            for (int i = 0; i < m; ++i)
             {
-                acc += U[i + k*m]*U[j + k*m];
-                acc -= Up[i + k*m]*Up[j + k*m];
+                double acc = 0;
+
+                for (int k = 0; k < p; ++k)
+                {
+                    acc += U[i + k*m]*U[j + k*m];
+                    acc -= Up[i + k*m]*Up[j + k*m];
+                }
+
+                mem[i + j*m] = acc;
             }
 
-            mem[i + j*m] = acc;
-        }
+        Uerr = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, m, mem, m);
 
-    Uerr = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, m, mem, m);
+        /*M = Vt.T@Vt - Vtp.T@Vtp n-by-n */
 
-    /*M = Vt.T@Vt - Vtp.T@Vtp n-by-n */
-
-    for (int j = 0; j < n; ++j)
-        for (int i = 0; i < n; ++i)
-        {
-            double acc = 0;
-
-            for (int k = 0; k < p; ++k)
+        for (int j = 0; j < n; ++j)
+            for (int i = 0; i < n; ++i)
             {
-                acc += Vt[k + i*n]*Vt[k + j*n];
-                acc -= Vtp[k + i*p]*Vtp[k + j*p];
+                double acc = 0;
+
+                for (int k = 0; k < p; ++k)
+                {
+                    acc += Vt[k + i*n]*Vt[k + j*n];
+                    acc -= Vtp[k + i*p]*Vtp[k + j*p];
+                }
+
+                mem[i + j*n] = acc;
             }
 
-            mem[i + j*n] = acc;
-        }
+        Verr = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', n, n, mem, n);
 
-    Verr = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', n, n, mem, n);
+        errs[2] = Uerr, errs[3] = Verr;
+    }
 
     free(mem);
 
-    errs[0] = Aerr, errs[1] = Serr, errs[2] = Uerr, errs[3] = Verr;
+    errs[0] = Aerr, errs[1] = Serr;
 
     return 0;
 }
@@ -223,6 +232,7 @@ int params_init(params_t *ps)
     ps->cond = 100.f;
     ps->dmax = 2.f;
     ps->seed = -1;
+    ps->fast = 0;
 
     return 0;
 }
@@ -238,7 +248,7 @@ int usage(char *argv[], const params_t *ps)
     fprintf(stderr, "         -c FLOAT  DLATMS cond or condition number [%.3e]\n", ps->cond);
     fprintf(stderr, "         -d FLOAT  DLATMS dmax or damping factor [%.3e]\n", ps->dmax);
     fprintf(stderr, "         -s INT    RNG seed [%d]\n", ps->seed);
-    fprintf(stderr, "         -S FILE   output singular values file\n");
+    fprintf(stderr, "         -F        skip singular vector computations (faster)\n");
     fprintf(stderr, "         -h        help message\n");
     return 1;
 }
@@ -248,7 +258,7 @@ int parse_params(int argc, char *argv[], params_t *ps)
     int c;
     params_init(ps);
 
-    while ((c = getopt(argc, argv, "m:n:p:b:u:c:d:s:h")) >= 0)
+    while ((c = getopt(argc, argv, "m:n:p:b:u:c:d:s:Fh")) >= 0)
     {
         if      (c == 'm') ps->m = atoi(optarg);
         else if (c == 'n') ps->n = atoi(optarg);
@@ -258,6 +268,7 @@ int parse_params(int argc, char *argv[], params_t *ps)
         else if (c == 'c') ps->cond = atof(optarg);
         else if (c == 'd') ps->dmax = atof(optarg);
         else if (c == 's') ps->seed = atoi(optarg);
+        else if (c == 'F') ps->fast = 1;
         else if (c == 'h')
         {
             params_init(ps);
@@ -335,14 +346,15 @@ int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, doub
     return 0;
 }
 
-int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n)
+int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n, int fast)
 {
     double *Al = malloc(m*n*sizeof(double));
     double *work = malloc(5*n*sizeof(double));
 
     memcpy(Al, A, m*n*sizeof(double));
 
-    LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', m, n, Al, m, S, U, m, Vt, n, work);
+    char job = fast? 'N' : 'S';
+    LAPACKE_dgesvd(LAPACK_COL_MAJOR, job, job, m, n, Al, m, S, U, m, Vt, n, work);
 
     free(Al);
     free(work);
