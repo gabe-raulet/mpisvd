@@ -98,7 +98,7 @@ int compute_errors(const double *A,
                    int m, int n, int p,
                    double errs[4])
 {
-    double *Ap = malloc(m*n*sizeof(double));
+    double *mem = malloc(m*n*sizeof(double));
 
     for (int j = 0; j < n; ++j)
         for (int i = 0; i < m; ++i)
@@ -110,15 +110,12 @@ int compute_errors(const double *A,
                 acc += Up[i + k*m]*Sp[k]*Vtp[k + j*p];
             }
 
-            Ap[i + j*m] = acc;
+            mem[i + j*m] = acc - A[i + j*m];
         }
 
-    for (int i = 0; i < m*n; ++i)
-        Ap[i] -= A[i];
+    errs[0] = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, n, mem, m);
 
-    errs[0] = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, n, Ap, m);
-
-    free(Ap);
+    free(mem);
     return 0;
 }
 
