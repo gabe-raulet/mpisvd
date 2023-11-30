@@ -4,7 +4,7 @@ INCS=-I/opt/homebrew/Cellar/openblas/0.3.24/include -I/opt/homebrew/include -I./
 LIBS=-L/opt/homebrew/Cellar/lapack/3.12.0/lib -L/opt/homebrew/Cellar/openblas/0.3.24/lib
 LINKS=-llapacke -lopenblas
 OBJS=kiss.o mmio.o mmio_dense.o svd_routines.o
-PROGS=serial_svd dist_svd
+PROGS=serial_svd dist_svd gen_svd
 CFLAGS=-Wall
 
 D?=0
@@ -25,6 +25,9 @@ test: full_svd
 	python run_serial_tests.py
 
 full_svd: full_svd.c $(OBJS)
+	$(MPICC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
+
+gen_svd: gen_svd.c $(OBJS)
 	$(MPICC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
 
 serial_svd: serial_svd.c $(OBJS)
