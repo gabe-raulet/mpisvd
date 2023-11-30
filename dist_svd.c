@@ -15,7 +15,7 @@
 int myrank;
 int nprocs;
 
-typedef struct { int m, n, p, b, mode, seed, fast; double cond, dmax; } params_t;
+typedef struct { int m, n, p, mode, seed, fast; double cond, dmax; } params_t;
 
 int iseed[4];
 int iseed_init();
@@ -30,7 +30,7 @@ int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, doub
 int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n, int fast);
 double l2dist(const double *x, const double *y, int n);
 int compute_errors(const double *A, const double *U, const double *Up, const double *S, const double *Sp, const double *Vt, const double *Vtp, int m, int n, int p, double errs[4], int fast);
-int svd_serial(double const *A, double *Up, double *Sp, double *Vtp, int m, int n, int p, int b);
+int svd_dist(const double *Aloc, double *Up, double *Sp, double *Vtp, int m, int n, int p);
 double get_clock_telapsed(struct timespec start, struct timespec end);
 
 int main(int argc, char *argv[])
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 
     iseed_init();
 
-    int m=params.m, n=params.n, p=params.p, b=params.b, mode=params.mode, fast=params.fast;
+    int m=params.m, n=params.n, p=params.p, mode=params.mode, fast=params.fast;
     double cond=params.cond, dmax=params.dmax;
 
     if (svdgen_param_check(m, n, mode, cond, dmax))
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (svdalg_param_check(m, n, p, b))
+    if (svdalg_param_check(m, n, p, nprocs))
     {
         MPI_Finalize();
         return 1;
@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 
     double telapsed = MPI_Wtime();
 
-    double *A, *S, *U, *Vt, *Scheck;
+    double *A, *Aloc, *S, *U, *Vt, *Scheck;
 
     if (!myrank)
     {
@@ -100,14 +100,27 @@ int main(int argc, char *argv[])
 
     MPI_Barrier(MPI_COMM_WORLD);
 
+    double *Up, *Sp, *Vtp;
 
-    //double *Up = malloc(m*p*sizeof(double));
-    //double *Sp = malloc(p*sizeof(double));
-    //double *Vtp = malloc(p*n*sizeof(double));
+    if (!myrank)
+    {
+        Up = malloc(m*p*sizeof(double));
+        Sp = malloc(p*sizeof(double));
+        Vtp = malloc(p*n*sizeof(double));
+    }
 
-    //clock_gettime(CLOCK_MONOTONIC, &start);
+    int nloc = n / nprocs;
+
+    Aloc = malloc(m*nloc*sizeof(double));
+    MPI_Scatter(A, m*nloc, MPI_DOUBLE, Aloc, m*nloc, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     //svd_serial(A, Up, Sp, Vtp, m, n, p, b);
+    if (svd_dist(Aloc, Up, Sp, Vtp, m, n, p) != 0)
+    {
+        MPI_Finalize();
+        return 1;
+    }
+    printf("here%d\n", myrank+1);
 
     //clock_gettime(CLOCK_MONOTONIC, &end);
     //svdtime = get_clock_telapsed(start, end);
@@ -247,7 +260,6 @@ int params_init(params_t *ps)
     ps->m = 256;
     ps->n = 128;
     ps->p = 10;
-    ps->b = 8;
     ps->mode = -1;
     ps->cond = 100.f;
     ps->dmax = 2.f;
@@ -265,7 +277,6 @@ int usage(char *argv[], const params_t *ps)
         fprintf(stderr, "Options: -m INT    rows of test matrix [%d]\n", ps->m);
         fprintf(stderr, "         -n INT    columns of test matrix [%d]\n", ps->n);
         fprintf(stderr, "         -p INT    SVD truncation parameter [%d]\n", ps->p);
-        fprintf(stderr, "         -b INT    number of 'compute nodes'[%d]\n", ps->b);
         fprintf(stderr, "         -u INT    matrix generation mode [%d]\n", ps->mode);
         fprintf(stderr, "         -c FLOAT  DLATMS cond or condition number [%.3e]\n", ps->cond);
         fprintf(stderr, "         -d FLOAT  DLATMS dmax or damping factor [%.3e]\n", ps->dmax);
@@ -281,12 +292,11 @@ int parse_params(int argc, char *argv[], params_t *ps)
     int c;
     params_init(ps);
 
-    while ((c = getopt(argc, argv, "m:n:p:b:u:c:d:s:Fh")) >= 0)
+    while ((c = getopt(argc, argv, "m:n:p:u:c:d:s:Fh")) >= 0)
     {
         if      (c == 'm') ps->m = atoi(optarg);
         else if (c == 'n') ps->n = atoi(optarg);
         else if (c == 'p') ps->p = atoi(optarg);
-        else if (c == 'b') ps->b = atoi(optarg);
         else if (c == 'u') ps->mode = atoi(optarg);
         else if (c == 'c') ps->cond = atof(optarg);
         else if (c == 'd') ps->dmax = atof(optarg);
@@ -385,86 +395,112 @@ int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n,
     return 0;
 }
 
-int svd_serial
-(
-    double const *A, /* input m-by-n matrx */
-    double *Up, /* output m-by-p matrix */
-    double *Sp, /* output p-by-p diagonal matrix */
-    double *Vtp, /* output p-by-n matrix */
-    int m, /* rows of A */
-    int n, /* columns of A */
-    int p, /* rank approximation */
-    int b /* number of seed nodes in binary topology */
-)
+double get_clock_telapsed(struct timespec start, struct timespec end)
 {
-    double *Al = malloc(m*n*sizeof(double));
-    memcpy(Al, A, m*n*sizeof(double));
+    uint64_t diff = 1000000000L * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec);
+    return (diff / 1000000000.0);
+}
 
-    int q = log2i(b);
-    assert(q >= 1);
+int svd_dist(const double *Aloc, double *Up, double *Sp, double *Vtp, int m, int n, int p)
+{
+    int myrank, nprocs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-    int s = n / b;
+    assert(n % nprocs == 0);
 
-    if (s <= p)
-    {
-        fprintf(stderr, "[error] svd_serial: trying to compute %d-truncated SVD with s=%d\n", p, s);
-        return -1;
-    }
+    int s = n / nprocs;
 
-    double *Acat = malloc(m*p*b*sizeof(double));
-    double *Vtcat = malloc(p*s*b*sizeof(double)); /* note: s*b == n */
-
-    double const *Ai;
     double *A1i, *Vt1i;
 
-    for (int i = 0; i < b; ++i)
-    {
-        Ai = &Al[i*m*s];
-        A1i = &Acat[i*m*p];
-        Vt1i = &Vtcat[i*p*s];
+    A1i = malloc(m*s*sizeof(double));
+    Vt1i = malloc(s*p*sizeof(double));
 
-        seed_node(Ai, A1i, Vt1i, m, n, q, p);
+    int q = log2i(nprocs);
+
+    seed_node(Aloc, A1i, Vt1i, m, n, q, p);
+
+    double *Amem = malloc(2*m*p*sizeof(double));
+    double *Vtmem = malloc(n*p*sizeof(double)); /* this should be allocated with less memory depending on what myrank is */
+
+    if (myrank % 2 != 0)
+    {
+        MPI_Send(A1i, m*p, MPI_DOUBLE, myrank-1, myrank, MPI_COMM_WORLD);
+        MPI_Send(Vt1i, p*s, MPI_DOUBLE, myrank-1, myrank+nprocs, MPI_COMM_WORLD);
+    }
+    else
+    {
+        memcpy(Amem, A1i, m*p*sizeof(double));
+        memcpy(Vtmem, Vt1i, p*s*sizeof(double));
+        MPI_Recv(&Amem[m*p], m*p, MPI_DOUBLE, myrank+1, myrank+1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(&Vtmem[p*s], p*s, MPI_DOUBLE, myrank+1, myrank+1+nprocs, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
     double *Ak_2i_0, *Vtk_2i_0, *Ak_2i_1, *Vtk_2i_1, *Ak1_lj, *Vtk1_lj;
 
     for (int k = 1; k < q; ++k)
     {
-        int c = 1 << (q-k); /* nodes on this level */
         int d = s * (1 << (k-1)); /* column count of incoming Vtk_2i_j matrices */
 
-        for (int i = 0; i < c; ++i)
+        Ak_2i_0 = &Amem[0]; /* m-by-p */
+        Ak_2i_1 = &Amem[m*p]; /* m-by-p */
+        Vtk_2i_0 = &Vtmem[0]; /* p-by-d */
+        Vtk_2i_1 = &Vtmem[p*d]; /* p-by-d */
+
+        Ak1_lj = &Amem[0]; /* m-by-p on exit */
+        Vtk1_lj = &Vtmem[0]; /* p-by-2d on exit */
+
+        combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
+
+        /* MPI_Recv(buf, count, dtype, source, tag, comm) */
+        /* MPI_Send(buf, count, dtype, dest, tag, comm) */
+
+        if ((myrank % (1 << (k+1))) == (1 << k))
         {
-            Ak_2i_0 = &Acat[(2*i)*m*p];
-            Ak_2i_1 = &Acat[(2*i+1)*m*p];
-            Vtk_2i_0 = &Vtcat[(2*i)*p*d];
-            Vtk_2i_1 = &Vtcat[(2*i+1)*p*d];
 
-            Ak1_lj = &Acat[i*m*p];
-            Vtk1_lj = &Vtcat[(2*i)*p*d];
+            int dest = myrank - (1 << k);
+            int Atag = myrank;
+            int Vtag = myrank + nprocs;
 
-            combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
+            /*printf("k=%d: rank %d sending %d doubles to rank %d with tag %d\n", k, myrank, m*p, dest, Atag);*/
+            /*printf("k=%d: rank %d sending %d doubles to rank %d with tag %d\n", k, myrank, p*2*d, dest, Vtag);*/
+
+            MPI_Send(Ak1_lj, m*p, MPI_DOUBLE, dest, Atag, MPI_COMM_WORLD);
+            MPI_Send(Vtk1_lj, p*2*d, MPI_DOUBLE, dest, Vtag, MPI_COMM_WORLD);
         }
+        else if ((myrank % (1 << (k+1))) == 0)
+        {
+
+            int source = myrank + (1 << k);
+            int Atag = myrank + (1 << k);
+            int Vtag = myrank + (1 << k) + nprocs;
+
+            MPI_Recv(&Amem[m*p], m*p, MPI_DOUBLE, source, Atag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&Vtmem[p*2*d], p*2*d, MPI_DOUBLE, source, Vtag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+            /*printf("k=%d: rank %d received %d doubles from rank %d with tag %d\n", k, myrank, m*p, source, Atag);*/
+            /*printf("k=%d: rank %d received %d doubles from rank %d with tag %d\n", k, myrank, p*2*d, source, Vtag);*/
+        }
+
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     double *Aq1_11, *Aq1_12, *Vtq1_11, *Vtq1_12;
 
-    Aq1_11 = &Acat[0];
-    Aq1_12 = &Acat[m*p];
-    Vtq1_11 = &Vtcat[0];
-    Vtq1_12 = &Vtcat[(n*p)>>1];
+    if (!myrank)
+    {
+        Aq1_11 = &Amem[0];
+        Aq1_12 = &Amem[m*p];
+        Vtq1_11 = &Vtmem[0];
+        Vtq1_12 = &Vtmem[(n*p)>>1];
 
-    extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, Up, Sp, Vtp, m, n, q, p);
+        extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, Up, Sp, Vtp, m, n, q, p);
+    }
 
-    free(Acat);
-    free(Vtcat);
-    free(Al);
+    free(A1i);
+    free(Vt1i);
 
+    MPI_Barrier(MPI_COMM_WORLD);
     return 0;
-}
-
-double get_clock_telapsed(struct timespec start, struct timespec end)
-{
-    uint64_t diff = 1000000000L * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec);
-    return (diff / 1000000000.0);
 }

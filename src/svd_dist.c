@@ -55,7 +55,7 @@ int generate_svd_dist_test
     return 0;
 }
 
-int svd_dist(const double *Aloc, double **Up, double **Sp, double **Vtp, int m, int n, int p, int root, MPI_Comm comm)
+int svd_dist(const double *Aloc, double *Up, double *Sp, double *Vtp, int m, int n, int p, int root, MPI_Comm comm)
 {
     int myrank, nprocs;
     MPI_Comm_rank(comm, &myrank);
@@ -142,15 +142,20 @@ int svd_dist(const double *Aloc, double **Up, double **Sp, double **Vtp, int m, 
 
     double *Aq1_11, *Aq1_12, *Vtq1_11, *Vtq1_12;
 
-    Aq1_11 = &Amem[0];
-    Aq1_12 = &Amem[m*p];
-    Vtq1_11 = &Vtmem[0];
-    Vtq1_12 = &Vtmem[(n*p)>>1];
+    if (!myrank)
+    {
+        Aq1_11 = &Amem[0];
+        Aq1_12 = &Amem[m*p];
+        Vtq1_11 = &Vtmem[0];
+        Vtq1_12 = &Vtmem[(n*p)>>1];
 
-    extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, Up, Sp, Vtp, m, n, q, p);
+        extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, Up, Sp, Vtp, m, n, q, p);
+    }
 
     free(A1i);
     free(Vt1i);
+
+    MPI_Barrier(comm);
     return 0;
 }
 
