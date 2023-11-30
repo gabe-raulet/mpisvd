@@ -74,9 +74,15 @@ int main(int argc, char *argv[])
 
     double errs[4];
 
+    mmwrite("U.mtx", U, m, n);
+    mmwrite("Up.mtx", Up, m, p);
+
     compute_errors(A, U, Up, S, Sp, Vt, Vtp, m, n, p, errs);
 
     fprintf(stderr, "Aerr=%.18e\n", errs[0]);
+    /*fprintf(stderr, "Serr=%.18e\n", errs[1]);*/
+    fprintf(stderr, "Uerr=%.18e\n", errs[2]);
+    /*fprintf(stderr, "Verr=%.18e\n", errs[3]);*/
 
     /*********** TEST FINISH ************/
 
@@ -98,7 +104,7 @@ int compute_errors(const double *A,
                    int m, int n, int p,
                    double errs[4])
 {
-    double *mem = malloc(m*n*sizeof(double));
+    double *mem = malloc(m*m*sizeof(double));
 
     for (int j = 0; j < n; ++j)
         for (int i = 0; i < m; ++i)
@@ -114,6 +120,29 @@ int compute_errors(const double *A,
         }
 
     errs[0] = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, n, mem, m);
+
+    /*M = U@U.T - Up@Up.T m-by-m */
+
+    for (int j = 0; j < m; ++j)
+        for (int i = 0; i < m; ++i)
+        {
+            double acc = 0;
+
+            for (int k = 0; k < p; ++k)
+            {
+                acc += U[i + k*m]*U[j + k*m];
+                acc -= Up[i + k*m]*Up[j + k*m];
+            }
+
+            mem[i + j*m] = acc;
+        }
+
+    errs[2] = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, m, mem, m);
+
+    /*fprintf(stderr, "Aerr=%.18e\n", errs[0]);*/
+    /*fprintf(stderr, "Serr=%.18e\n", errs[1]);*/
+    /*fprintf(stderr, "Uerr=%.18e\n", errs[2]);*/
+    /*fprintf(stderr, "Verr=%.18e\n", errs[3]);*/
 
     free(mem);
     return 0;
