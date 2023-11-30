@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#include <time.h>
 #include <math.h>
 #include "kiss.h"
 #include "cblas.h"
@@ -26,10 +27,13 @@ int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n)
 double l2dist(const double *x, const double *y, int n);
 int compute_errors(const double *A, const double *U, const double *Up, const double *S, const double *Sp, const double *Vt, const double *Vtp, int m, int n, int p, double errs[4]);
 int svd_serial(double const *A, double **Up, double **Sp, double **Vtp, int m, int n, int p, int b);
+double get_clock_telapsed(struct timespec start, struct timespec end);
 
 int main(int argc, char *argv[])
 {
     params_t params;
+    struct timespec start, end;
+    double gentime, svdtime, errtime;
 
     if (parse_params(argc, argv, &params) != 0)
         return 1;
@@ -50,6 +54,8 @@ int main(int argc, char *argv[])
     if (svdalg_param_check(m, n, p, b))
         return 1;
 
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     double *A = malloc(m*n*sizeof(double));
     double *S = malloc(n*sizeof(double));
 
@@ -61,30 +67,44 @@ int main(int argc, char *argv[])
 
     gen_uv_mats(A, Scheck, U, Vt, m, n);
 
-    fprintf(stderr, "[main] l2-distance between DLATMS and DGESVD singular values = %.18e\n", l2dist(S, Scheck, n));
-    free(Scheck);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    gentime = get_clock_telapsed(start, end);
 
-    /*********** TEST START ************/
+    int show = n < 5? n : 5;
+    fprintf(stderr, "[main:gen_truth::*] diag(S)[0..%d] = ", show-1);
+    for (int i = 0; i < show; ++i) fprintf(stderr, "%.3e,", S[i]);
+    fprintf(stderr, "%s\n", n < 5? "" : "...");
+
+    fprintf(stderr, "[main:gen_truth::%.5f(s)] err=%.18e (DLATMS-vs-DGESVD) [S :: singular values]\n", gentime, l2dist(S, Scheck, n));
+    free(Scheck);
 
     double *Up;
     double *Sp;
     double *Vtp;
 
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     svd_serial(A, &Up, &Sp, &Vtp, m, n, p, b);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    svdtime = get_clock_telapsed(start, end);
+
+    fprintf(stderr, "[main:svd_serial::%.5f(s)]\n", svdtime);
 
     double errs[4];
 
-    mmwrite("U.mtx", U, m, n);
-    mmwrite("Up.mtx", Up, m, p);
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     compute_errors(A, U, Up, S, Sp, Vt, Vtp, m, n, p, errs);
 
-    fprintf(stderr, "Aerr=%.18e\n", errs[0]);
-    /*fprintf(stderr, "Serr=%.18e\n", errs[1]);*/
-    fprintf(stderr, "Uerr=%.18e\n", errs[2]);
-    /*fprintf(stderr, "Verr=%.18e\n", errs[3]);*/
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    errtime = get_clock_telapsed(start, end);
 
-    /*********** TEST FINISH ************/
+    fprintf(stderr, "[main:compute_errors::%.5f(s)]\n", errtime);
+    fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [A :: test matrix]\n", errs[0]);
+    fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [S :: singular values]\n", errs[1]);
+    fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [U :: singular vectors (left)]\n", errs[2]);
+    fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [V :: singular vectors (right)]\n", errs[3]);
 
     free(A);
     free(S);
@@ -104,6 +124,7 @@ int compute_errors(const double *A,
                    int m, int n, int p,
                    double errs[4])
 {
+    double Aerr, Serr, Uerr, Verr;
     double *mem = malloc(m*m*sizeof(double));
 
     for (int j = 0; j < n; ++j)
@@ -119,7 +140,9 @@ int compute_errors(const double *A,
             mem[i + j*m] = acc - A[i + j*m];
         }
 
-    errs[0] = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, n, mem, m);
+    Aerr = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, n, mem, m);
+
+    Serr = l2dist(S, Sp, p);
 
     /*M = U@U.T - Up@Up.T m-by-m */
 
@@ -137,14 +160,30 @@ int compute_errors(const double *A,
             mem[i + j*m] = acc;
         }
 
-    errs[2] = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, m, mem, m);
+    Uerr = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, m, mem, m);
 
-    /*fprintf(stderr, "Aerr=%.18e\n", errs[0]);*/
-    /*fprintf(stderr, "Serr=%.18e\n", errs[1]);*/
-    /*fprintf(stderr, "Uerr=%.18e\n", errs[2]);*/
-    /*fprintf(stderr, "Verr=%.18e\n", errs[3]);*/
+    /*M = Vt.T@Vt - Vtp.T@Vtp n-by-n */
+
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i)
+        {
+            double acc = 0;
+
+            for (int k = 0; k < p; ++k)
+            {
+                acc += Vt[k + i*n]*Vt[k + j*n];
+                acc -= Vtp[k + i*p]*Vtp[k + j*p];
+            }
+
+            mem[i + j*n] = acc;
+        }
+
+    Verr = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', n, n, mem, n);
 
     free(mem);
+
+    errs[0] = Aerr, errs[1] = Serr, errs[2] = Uerr, errs[3] = Verr;
+
     return 0;
 }
 
@@ -387,4 +426,10 @@ int svd_serial
     free(Al);
 
     return 0;
+}
+
+double get_clock_telapsed(struct timespec start, struct timespec end)
+{
+    uint64_t diff = 1000000000L * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec);
+    return (diff / 1000000000.0);
 }
