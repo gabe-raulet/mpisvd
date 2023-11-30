@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    double telapsed = MPI_Wtime();
+    gentime = MPI_Wtime();
 
     double *A, *Aloc, *S, *U, *Vt, *Scheck;
 
@@ -87,20 +87,22 @@ int main(int argc, char *argv[])
 
         gen_uv_mats(A, Scheck, U, Vt, m, n, fast);
 
-        telapsed = MPI_Wtime() - telapsed;
+        gentime = MPI_Wtime() - gentime;
 
         int show = n < 5? n : 5;
         fprintf(stderr, "[main[%d/%d]:gen_truth::*] diag(S)[0..%d] = ", myrank+1, nprocs, show-1);
         for (int i = 0; i < show; ++i) fprintf(stderr, "%.3e,", S[i]);
         fprintf(stderr, "%s\n", n < 5? "" : "...");
 
-        fprintf(stderr, "[main[%d/%d]:gen_truth::%.5f(s)] err=%.18e (DLATMS-vs-DGESVD) [S :: singular values]\n", myrank+1, nprocs, telapsed, l2dist(S, Scheck, n));
+        fprintf(stderr, "[main[%d/%d]:gen_truth::%.5f(s)] err=%.18e (DLATMS-vs-DGESVD) [S :: singular values]\n", myrank+1, nprocs, gentime, l2dist(S, Scheck, n));
         free(Scheck);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     double *Up, *Sp, *Vtp;
+
+    svdtime = MPI_Wtime();
 
     if (!myrank)
     {
@@ -114,41 +116,46 @@ int main(int argc, char *argv[])
     Aloc = malloc(m*nloc*sizeof(double));
     MPI_Scatter(A, m*nloc, MPI_DOUBLE, Aloc, m*nloc, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    //svd_serial(A, Up, Sp, Vtp, m, n, p, b);
     if (svd_dist(Aloc, Up, Sp, Vtp, m, n, p) != 0)
     {
         MPI_Finalize();
         return 1;
     }
-    printf("here%d\n", myrank+1);
 
-    //clock_gettime(CLOCK_MONOTONIC, &end);
-    //svdtime = get_clock_telapsed(start, end);
+    svdtime = MPI_Wtime() - svdtime;
 
-    //fprintf(stderr, "[main:svd_serial::%.5f(s)]\n", svdtime);
+    if (!myrank) fprintf(stderr, "[main:svd_dist::%.5f(s)]\n", svdtime);
 
-    //double errs[4];
+    if (!myrank)
+    {
+        double errs[4];
 
-    //clock_gettime(CLOCK_MONOTONIC, &start);
+        errtime = MPI_Wtime();
 
-    //compute_errors(A, U, Up, S, Sp, Vt, Vtp, m, n, p, errs);
+        compute_errors(A, U, Up, S, Sp, Vt, Vtp, m, n, p, errs, fast);
 
-    //clock_gettime(CLOCK_MONOTONIC, &end);
-    //errtime = get_clock_telapsed(start, end);
+        errtime = MPI_Wtime() - errtime;
 
-    //fprintf(stderr, "[main:compute_errors::%.5f(s)]\n", errtime);
-    //fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [A :: test matrix]\n", errs[0]);
-    //fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [S :: singular values]\n", errs[1]);
-    //fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [U :: singular vectors (left)]\n", errs[2]);
-    //fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [V :: singular vectors (right)]\n", errs[3]);
+        fprintf(stderr, "[main:compute_errors::%.5f(s)]\n", errtime);
+        fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [A :: test matrix]\n", errs[0]);
+        fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [S :: singular values]\n", errs[1]);
 
-    //free(A);
-    //free(S);
-    //free(Sp);
-    //free(U);
-    //free(Up);
-    //free(Vt);
-    //free(Vtp);
+        if (!fast)
+        {
+            fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [U :: singular vectors (left)]\n", errs[2]);
+            fprintf(stderr, "[main:compute_errors::*] err=%.18e (DLATMS-vs-RANDSVD) [V :: singular vectors (right)]\n", errs[3]);
+        }
+
+        free(A);
+        free(S);
+        free(Sp);
+        free(U);
+        free(Up);
+        free(Vt);
+        free(Vtp);
+    }
+
+    free(Aloc);
 
     MPI_Finalize();
     return 0;
