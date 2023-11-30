@@ -127,7 +127,7 @@ int seed_node(double const *Ai, double *A1i, double *Vt1i, int m, int n, int q, 
     return 0;
 }
 
-int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_12, double **U, double **S, double **Vt, int m, int n, int q, int p)
+int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_12, double *U, double *S, double *Vt, int m, int n, int q, int p)
 {
     int b = 1 << q;
     int s = n / b;
@@ -181,18 +181,11 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
 
     double *Aq = USq;
     double *Qq = W;
-    double *Uc = malloc(m*p*sizeof(double));
-    double *Sc = malloc(p*sizeof(double));
     double *Vtp = malloc(p*n*sizeof(double));
-    double *Vtc = malloc(p*n*sizeof(double));
 
-    svds_naive(Aq, Uc, Sc, Vtp, m, p, p);
+    svds_naive(Aq, U, S, Vtp, m, p, p);
 
-    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasTrans, p, n, p, 1.0, Vtp, p, Qq, n, 0.0, Vtc, p );
-
-    *U = Uc;
-    *S = Sc;
-    *Vt = Vtc;
+    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasTrans, p, n, p, 1.0, Vtp, p, Qq, n, 0.0, Vt, p );
 
     return 0;
 }

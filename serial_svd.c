@@ -26,7 +26,7 @@ int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, doub
 int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n);
 double l2dist(const double *x, const double *y, int n);
 int compute_errors(const double *A, const double *U, const double *Up, const double *S, const double *Sp, const double *Vt, const double *Vtp, int m, int n, int p, double errs[4]);
-int svd_serial(double const *A, double **Up, double **Sp, double **Vtp, int m, int n, int p, int b);
+int svd_serial(double const *A, double *Up, double *Sp, double *Vtp, int m, int n, int p, int b);
 double get_clock_telapsed(struct timespec start, struct timespec end);
 
 int main(int argc, char *argv[])
@@ -78,13 +78,13 @@ int main(int argc, char *argv[])
     fprintf(stderr, "[main:gen_truth::%.5f(s)] err=%.18e (DLATMS-vs-DGESVD) [S :: singular values]\n", gentime, l2dist(S, Scheck, n));
     free(Scheck);
 
-    double *Up;
-    double *Sp;
-    double *Vtp;
+    double *Up = malloc(m*p*sizeof(double));
+    double *Sp = malloc(p*sizeof(double));
+    double *Vtp = malloc(p*n*sizeof(double));
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    svd_serial(A, &Up, &Sp, &Vtp, m, n, p, b);
+    svd_serial(A, Up, Sp, Vtp, m, n, p, b);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     svdtime = get_clock_telapsed(start, end);
@@ -353,9 +353,9 @@ int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n)
 int svd_serial
 (
     double const *A, /* input m-by-n matrx */
-    double **Up, /* output m-by-p matrix */
-    double **Sp, /* output p-by-p diagonal matrix */
-    double **Vtp, /* output p-by-n matrix */
+    double *Up, /* output m-by-p matrix */
+    double *Sp, /* output p-by-p diagonal matrix */
+    double *Vtp, /* output p-by-n matrix */
     int m, /* rows of A */
     int n, /* columns of A */
     int p, /* rank approximation */
