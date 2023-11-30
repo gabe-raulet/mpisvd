@@ -8,9 +8,7 @@
 #include "cblas.h"
 #include "lapacke.h"
 #include "mmio_dense.h"
-
-/*# compute UU^T or L^TL*/
-/*[sdcz] lauum ( uplo, n, A, ldA, info )*/
+#include "svd_routines.h"
 
 typedef struct { int m, n, p, b, mode, seed; double cond, dmax; } params_t;
 
@@ -27,6 +25,7 @@ int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, doub
 int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n);
 double l2dist(const double *x, const double *y, int n);
 int compute_errors(const double *A, const double *U, const double *Up, const double *S, const double *Sp, const double *Vt, const double *Vtp, int m, int n, int p, double errs[4]);
+int svd_serial(double const *A, double **Up, double **Sp, double **Vtp, int m, int n, int p, int b);
 
 int main(int argc, char *argv[])
 {
@@ -67,29 +66,27 @@ int main(int argc, char *argv[])
 
     /*********** TEST START ************/
 
-    double *Up = malloc(m*p*sizeof(double));
-    double *Sp = malloc(p*sizeof(double));
-    double *Vtp = malloc(p*n*sizeof(double));
+    double *Up;
+    double *Sp;
+    double *Vtp;
 
-    memcpy(Up, U, m*p*sizeof(double));
-    memcpy(Sp, S, p*sizeof(double));
-    memcpy(Vtp, Vt, p*n*sizeof(double));
+    svd_serial(A, &Up, &Sp, &Vtp, m, n, p, b);
 
     double errs[4];
-
-    mmwrite("A.mtx", A, m, n);
-    mmwrite_diagonal("S.mtx", S, n);
 
     compute_errors(A, U, Up, S, Sp, Vt, Vtp, m, n, p, errs);
 
     fprintf(stderr, "Aerr=%.18e\n", errs[0]);
 
-
-
     /*********** TEST FINISH ************/
 
     free(A);
     free(S);
+    free(Sp);
+    free(U);
+    free(Up);
+    free(Vt);
+    free(Vtp);
 
     return 0;
 }
@@ -110,7 +107,7 @@ int compute_errors(const double *A,
 
             for (int k = 0; k < p; ++k)
             {
-                acc += U[i + k*m]*Sp[k]*Vtp[k + j*p];
+                acc += Up[i + k*m]*Sp[k]*Vtp[k + j*p];
             }
 
             Ap[i + j*m] = acc;
@@ -284,6 +281,84 @@ int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n)
 
     free(Al);
     free(work);
+
+    return 0;
+}
+
+int svd_serial
+(
+    double const *A, /* input m-by-n matrx */
+    double **Up, /* output m-by-p matrix */
+    double **Sp, /* output p-by-p diagonal matrix */
+    double **Vtp, /* output p-by-n matrix */
+    int m, /* rows of A */
+    int n, /* columns of A */
+    int p, /* rank approximation */
+    int b /* number of seed nodes in binary topology */
+)
+{
+    double *Al = malloc(m*n*sizeof(double));
+    memcpy(Al, A, m*n*sizeof(double));
+
+    int q = log2i(b);
+    assert(q >= 1);
+
+    int s = n / b;
+
+    if (s <= p)
+    {
+        fprintf(stderr, "[error] svd_serial: trying to compute %d-truncated SVD with s=%d\n", p, s);
+        return -1;
+    }
+
+    double *Acat = malloc(m*p*b*sizeof(double));
+    double *Vtcat = malloc(p*s*b*sizeof(double)); /* note: s*b == n */
+
+    double const *Ai;
+    double *A1i, *Vt1i;
+
+    for (int i = 0; i < b; ++i)
+    {
+        Ai = &Al[i*m*s];
+        A1i = &Acat[i*m*p];
+        Vt1i = &Vtcat[i*p*s];
+
+        seed_node(Ai, A1i, Vt1i, m, n, q, p);
+    }
+
+    double *Ak_2i_0, *Vtk_2i_0, *Ak_2i_1, *Vtk_2i_1, *Ak1_lj, *Vtk1_lj;
+
+    for (int k = 1; k < q; ++k)
+    {
+        int c = 1 << (q-k); /* nodes on this level */
+        int d = s * (1 << (k-1)); /* column count of incoming Vtk_2i_j matrices */
+
+        for (int i = 0; i < c; ++i)
+        {
+            Ak_2i_0 = &Acat[(2*i)*m*p];
+            Ak_2i_1 = &Acat[(2*i+1)*m*p];
+            Vtk_2i_0 = &Vtcat[(2*i)*p*d];
+            Vtk_2i_1 = &Vtcat[(2*i+1)*p*d];
+
+            Ak1_lj = &Acat[i*m*p];
+            Vtk1_lj = &Vtcat[(2*i)*p*d];
+
+            combine_node(Ak_2i_0, Vtk_2i_0, Ak_2i_1, Vtk_2i_1, Ak1_lj, Vtk1_lj, m, n, k, q, p);
+        }
+    }
+
+    double *Aq1_11, *Aq1_12, *Vtq1_11, *Vtq1_12;
+
+    Aq1_11 = &Acat[0];
+    Aq1_12 = &Acat[m*p];
+    Vtq1_11 = &Vtcat[0];
+    Vtq1_12 = &Vtcat[(n*p)>>1];
+
+    extract_node(Aq1_11, Vtq1_11, Aq1_12, Vtq1_12, Up, Sp, Vtp, m, n, q, p);
+
+    free(Acat);
+    free(Vtcat);
+    free(Al);
 
     return 0;
 }
