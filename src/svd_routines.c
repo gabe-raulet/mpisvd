@@ -21,22 +21,7 @@ int svds_naive(const double *A, double *Up, double *Sp, double *Vpt, int m, int 
     U = malloc(m*drank*sizeof(double));
     Vt = malloc(drank*n*sizeof(double));
 
-    LAPACKE_dgesvd
-    (
-        LAPACK_COL_MAJOR,
-       'S',
-       'S',
-        m,
-        n,
-        Acast,
-        m,
-        S,
-        U,
-        m,
-        Vt,
-        drank,
-        work
-    );
+    LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', m, n, Acast, m, S, U, m, Vt, drank, work);
 
     memcpy(Up, U, p*m*sizeof(double));
     memcpy(Sp, S, p*sizeof(double));
@@ -84,10 +69,6 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
 
     svds_naive(Aki, Uki, Ski, Vtki, m, 2*p, p);
 
-    /*
-     * Compute USki = Uki*Ski.
-     */
-
     double *USki = Uki;
 
     for (int j = 0; j < p; ++j)
@@ -96,84 +77,20 @@ int combine_node(double *Ak_2i_0, double *Vtk_2i_0, double *Ak_2i_1, double *Vtk
 
     free(Ski);
 
-    /*
-     * Compute W = Tr(Vhtki)*Tr(Vtki).
-     *
-     * W :: 2d-by-p
-     * Tr(Vhtki) :: 2d-by-2p
-     * Tr(Vtki) :: 2p-by-p
-     */
-
     double *W = malloc((2*d)*p*sizeof(double));
 
-    cblas_dgemm
-    (
-        CblasColMajor, /* all matrices stored column-major */
-           CblasTrans, /* transpose Vhtki */
-           CblasTrans, /* transpose Vtki */
-                  2*d, /* number of rows of W (and Tr(Vhtki)) */
-                    p, /* number of columns of W (and Tr(Vtki)) */
-                  2*p, /* number of columns of Tr(Vhtki) (and number of rows of Tr(Vtki)) */
-                  1.0, /* the alpha in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
-                Vhtki, /* Vhtki matrix */
-                  2*p, /* leading dimension of Vhtki */
-                 Vtki, /* Vtki matrix */
-                    p, /* leading dimension of Vtki */
-                  0.0, /* the beta in "W <- alpha*Tr(Vhtki)*Tr(Vtki) + beta*W" */
-                    W, /* W matrix */
-                  2*d  /* leading dimension of W */
-    );
+    cblas_dgemm(CblasColMajor, CblasTrans, CblasTrans, 2*d, p, 2*p, 1.0, Vhtki, 2*p, Vtki, p, 0.0, W, 2*d);
 
     free(Vtki);
     free(Vhtki);
 
-    /*
-     * Compute QR-factorization W = Qki*Rki.
-     *
-     * W :: 2d-by-p
-     * Qki :: 2d-by-p
-     * Rki :: p-by-p
-     */
-
     assert(2*d >= p);
     double *tau = malloc(p*sizeof(double));
 
-
     LAPACKE_dgeqrf(LAPACK_COL_MAJOR, 2*d, p, W, 2*d, tau);
-
-    /*
-     * W now contains Rki in its leading p-by-p upper triangular portion.
-     * Compute Rki^{-1} in-place with DTRTRI. On exit, The upper triangular
-     * portion will then store Rki^{-1}, and lucky for us the entries in the
-     * strictly lower triangular portion of W are untouched, so we can use the
-     * reflectors stored there to reconstruct Q after with DORGQR.
-     */
-
     LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', p, W, 2*d);
 
-    /*
-     * Compute Aki = USki * inv(Rki).
-     *
-     * Aki :: m-by-p
-     * USki :: m-by-p
-     * inv(Rki) :: p-by-p :: upper triangular stored in in W
-     */
-
-    cblas_dtrmm
-    (
-        CblasColMajor, /* all matrices stored column-major */
-           CblasRight, /* triangular matrix on the right */
-           CblasUpper, /* Rki is upper triangular */
-         CblasNoTrans, /* don't transpose Rki */
-         CblasNonUnit, /* Rki not necessarily unit triangular */
-                    m, /* number of rows of USki */
-                    p, /* number of columns of USki */
-                  1.0, /* the alpha in Aki := alpha*USki*inv(Rki) */
-                    W, /* inv(Rki) contained in the upper triangular portion of W */
-                  2*d, /* leading dimension of W */
-                 USki, /* USki on entry, Aki on exit */
-                    m  /* leading dimension of USki */
-    );
+    cblas_dtrmm(CblasColMajor, CblasRight, CblasUpper, CblasNoTrans, CblasNonUnit, m, p, 1.0, W, 2*d, USki, m);
 
     LAPACKE_dorgqr(LAPACK_COL_MAJOR, 2*d, p, p, W, 2*d, tau);
 
@@ -201,10 +118,6 @@ int seed_node(double const *Ai, double *A1i, double *Vt1i, int m, int n, int q, 
     double *Sp = malloc(p*sizeof(double));
 
     svds_naive(Ai, A1i, Sp, Vt1i, m, s, p);
-
-    /*
-     * Compute Up*Sp and write it to A1i.
-     */
 
     for (int j = 0; j < p; ++j)
         for (int i = 0; i < m; ++i)
@@ -251,23 +164,7 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
 
     double *W = malloc(n*p*sizeof(double));
 
-    cblas_dgemm
-    (
-        CblasColMajor, /* all matrices stored column-major */
-           CblasTrans, /* transpose Vhtq1 */
-           CblasTrans, /* transpose Vtq */
-                    n, /* number of rows of W (and Tr(Vhtq1)) */
-                    p, /* number of columns of W (and Tr(Vtq)) */
-                  2*p, /* number of columns of Tr(Vhtq1) (and number of rows of Tr(Vtq)) */
-                  1.0, /* the alpha in "W <- alpha*Tr(Vhtq1)*Tr(Vtq) + beta*W" */
-                Vhtq1, /* Vhtq1 matrix */
-                  2*p, /* leading dimension of Vhtq1 */
-                  Vtq, /* Vtq matrix */
-                    p, /* leading dimension of Vtq */
-                  0.0, /* the beta in "W <- alpha*Tr(Vhtq1)*Tr(Vtq) + beta*W" */
-                    W, /* W matrix */
-                    n  /* leading dimension of W */
-    );
+    cblas_dgemm(CblasColMajor, CblasTrans, CblasTrans, n, p, 2*p, 1.0, Vhtq1, 2*p, Vtq, p, 0.0, W, n);
 
     free(Vtq);
     free(Vhtq1);
@@ -278,21 +175,7 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
     LAPACKE_dgeqrf(LAPACK_COL_MAJOR, n, p, W, n, tau);
     LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', p, W, n);
 
-    cblas_dtrmm
-    (
-        CblasColMajor, /* all matrices stored column-major */
-           CblasRight, /* triangular matrix on the right */
-           CblasUpper, /* Rq is upper triangular */
-         CblasNoTrans, /* don't transpose Rq */
-         CblasNonUnit, /* Rq not necessarily unit triangular */
-                    m, /* number of rows of USq */
-                    p, /* number of columns of USq */
-                  1.0, /* the alpha in Aq := alpha*USq*inv(Rq) */
-                    W, /* inv(Rq) contained in the upper triangular portion of W */
-                  2*d, /* leading dimension of W */
-                  USq, /* USq on entry, Aq on exit */
-                    m  /* leading dimension of USq */
-    );
+    cblas_dtrmm(CblasColMajor, CblasRight, CblasUpper, CblasNoTrans, CblasNonUnit, m, p, 1.0, W, 2*d, USq, m);
 
     LAPACKE_dorgqr(LAPACK_COL_MAJOR, n, p, p, W, n, tau);
 
@@ -305,32 +188,7 @@ int extract_node(double *Aq1_11, double *Vtq1_11, double *Aq1_12, double *Vtq1_1
 
     svds_naive(Aq, Uc, Sc, Vtp, m, p, p);
 
-    /*
-     * Uc is m-by-p
-     * Sc is p-by-p
-     * Vtp is p-by-p
-     * Qq is n-by-p
-     *
-     * Vtc = Vtp*Qq.T is p-by-n
-     */
-
-    cblas_dgemm
-    (
-        CblasColMajor, /* all matrices stored column-major */
-         CblasNoTrans, /* don't transpose A */
-           CblasTrans, /* transpose B */
-                    p, /* number of rows of C */
-                    n, /* number of columns of C */
-                    p, /* number of columns of A */
-                  1.0, /* the alpha in "C <- alpha*op(A)*op(B) + beta*C" */
-                  Vtp, /* A matrix */
-                    p, /* leading dimension of A */
-                   Qq, /* B matrix */
-                    n, /* leading dimension of B */
-                  0.0, /* beta */
-                  Vtc, /* C matrix */
-                    p  /* leading dimension of C */
-    );
+    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasTrans, p, n, p, 1.0, Vtp, p, Qq, n, 0.0, Vtc, p );
 
     *U = Uc;
     *S = Sc;
