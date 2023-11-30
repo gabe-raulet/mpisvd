@@ -7,6 +7,10 @@
 #include "kiss.h"
 #include "cblas.h"
 #include "lapacke.h"
+#include "mmio_dense.h"
+
+/*# compute UU^T or L^TL*/
+/*[sdcz] lauum ( uplo, n, A, ldA, info )*/
 
 typedef struct { int m, n, p, b, mode, seed; double cond, dmax; } params_t;
 
@@ -19,6 +23,7 @@ int svdalg_param_check(int m, int n, int p, int b);
 int params_init(params_t *ps);
 int parse_params(int argc, char *argv[], params_t *ps);
 int usage(char *argv[], const params_t *ps);
+int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, double dmax);
 
 int main(int argc, char *argv[])
 {
@@ -42,6 +47,17 @@ int main(int argc, char *argv[])
 
     if (svdalg_param_check(m, n, p, b))
         return 1;
+
+    double *A = malloc(m*n*sizeof(double));
+    double *S = malloc(n*sizeof(double));
+
+    gen_test_mat(A, S, m, n, mode, cond, dmax);
+
+    mmwrite("A.mtx", A, m, n);
+    mmwrite_diagonal("S.mtx", S, n);
+
+    free(A);
+    free(S);
 
     return 0;
 }
@@ -168,6 +184,23 @@ int svdalg_param_check(int m, int n, int p, int b)
         fprintf(stderr, "[error:svdalg_param_check][b=%d,n=%d] must have b > 1 and n %% b == 0 with b being a power of 2\n", b, n);
         return 1;
     }
+
+    return 0;
+}
+
+int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, double dmax)
+{
+    if (mode < 0)
+    {
+        S[0] = cond;
+
+        for (int i = 1; i < n; ++i)
+            S[i] = S[i-1] / dmax;
+
+        mode = 0;
+    }
+
+    LAPACKE_dlatms(LAPACK_COL_MAJOR, m, n, 'U', iseed, 'N', S, 0, 0., 0., m, n, 'N', A, m);
 
     return 0;
 }

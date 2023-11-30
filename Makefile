@@ -31,7 +31,7 @@ serial_svd: serial_svd.c $(OBJS)
 	$(MPICC) $(CFLAGS) $(INCS) $(LIBS) $(LINKS) -o $@ $^
 
 clean:
-	rm -rf *.dSYM *.o *.out *.mtx *.diag
+	rm -rf $(PROGS) *.dSYM *.o *.out *.mtx *.diag
 
 distclean: clean
 	rm -rf $(PROGS)
