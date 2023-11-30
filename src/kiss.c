@@ -42,6 +42,17 @@ uint32_t kiss_rand(void)
     return x + y + z;
 }
 
+void kiss_seed(uint32_t seed)
+{
+    seed++;
+
+    x = seed;
+    y = 123*seed + 234;
+    z = 6432*seed;
+
+    c = (seed + 86543331) % 698769068 + 1;
+}
+
 void kiss_init(void)
 {
     x = dev_rand();

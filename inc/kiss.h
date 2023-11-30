@@ -27,6 +27,11 @@ uint32_t kiss_rand(void);
 void kiss_init(void);
 
 /*
+ * @func kiss_seed - Initializes KISS generator using seed.
+ */
+void kiss_seed(uint32_t seed);
+
+/*
  * @func kiss_unirandf - Generates uniformly random double-precision (64 bits) floating
  * point number in the interval between 0 and 1.
  */
