@@ -26,6 +26,7 @@ int usage(char *argv[], const params_t *ps);
 int gen_test_mat(double *A, double *S, int m, int n, int mode, double cond, double dmax);
 int gen_uv_mats(const double *A, double *S, double *U, double *Vt, int m, int n);
 double l2dist(const double *x, const double *y, int n);
+int compute_errors(const double *A, const double *U, const double *Up, const double *S, const double *Sp, const double *Vt, const double *Vtp, int m, int n, int p, double errs[4]);
 
 int main(int argc, char *argv[])
 {
@@ -62,10 +63,65 @@ int main(int argc, char *argv[])
     gen_uv_mats(A, Scheck, U, Vt, m, n);
 
     fprintf(stderr, "[main] l2-distance between DLATMS and DGESVD singular values = %.18e\n", l2dist(S, Scheck, n));
+    free(Scheck);
+
+    /*********** TEST START ************/
+
+    double *Up = malloc(m*p*sizeof(double));
+    double *Sp = malloc(p*sizeof(double));
+    double *Vtp = malloc(p*n*sizeof(double));
+
+    memcpy(Up, U, m*p*sizeof(double));
+    memcpy(Sp, S, p*sizeof(double));
+    memcpy(Vtp, Vt, p*n*sizeof(double));
+
+    double errs[4];
+
+    mmwrite("A.mtx", A, m, n);
+    mmwrite_diagonal("S.mtx", S, n);
+
+    compute_errors(A, U, Up, S, Sp, Vt, Vtp, m, n, p, errs);
+
+    fprintf(stderr, "Aerr=%.18e\n", errs[0]);
+
+
+
+    /*********** TEST FINISH ************/
 
     free(A);
     free(S);
 
+    return 0;
+}
+
+int compute_errors(const double *A,
+                   const double *U, const double *Up,
+                   const double *S, const double *Sp,
+                   const double *Vt, const double *Vtp,
+                   int m, int n, int p,
+                   double errs[4])
+{
+    double *Ap = malloc(m*n*sizeof(double));
+
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < m; ++i)
+        {
+            double acc = 0;
+
+            for (int k = 0; k < p; ++k)
+            {
+                acc += U[i + k*m]*Sp[k]*Vtp[k + j*p];
+            }
+
+            Ap[i + j*m] = acc;
+        }
+
+    for (int i = 0; i < m*n; ++i)
+        Ap[i] -= A[i];
+
+    errs[0] = LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', m, n, Ap, m);
+
+    free(Ap);
     return 0;
 }
 
