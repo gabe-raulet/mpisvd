@@ -82,30 +82,24 @@ int main(int argc, char *argv[])
         gen_test_mat(A, S, m, n, mode, cond, dmax);
 
         Scheck = malloc(n*sizeof(double));
-        U = malloc(m*n*sizeof(double));
-        Vt = malloc(n*n*sizeof(double));
+        U = fast? NULL : malloc(m*n*sizeof(double));
+        Vt = fast? NULL : malloc(n*n*sizeof(double));
 
         gen_uv_mats(A, Scheck, U, Vt, m, n, fast);
+
+        telapsed = MPI_Wtime() - telapsed;
+
+        int show = n < 5? n : 5;
+        fprintf(stderr, "[main[%d/%d]:gen_truth::*] diag(S)[0..%d] = ", myrank+1, nprocs, show-1);
+        for (int i = 0; i < show; ++i) fprintf(stderr, "%.3e,", S[i]);
+        fprintf(stderr, "%s\n", n < 5? "" : "...");
+
+        fprintf(stderr, "[main[%d/%d]:gen_truth::%.5f(s)] err=%.18e (DLATMS-vs-DGESVD) [S :: singular values]\n", myrank+1, nprocs, telapsed, l2dist(S, Scheck, n));
+        free(Scheck);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    //double *Scheck = malloc(n*sizeof(double));
-    //double *U = malloc(m*n*sizeof(double));
-    //double *Vt = malloc(n*n*sizeof(double));
-
-    //gen_uv_mats(A, Scheck, U, Vt, m, n);
-
-    //clock_gettime(CLOCK_MONOTONIC, &end);
-    //gentime = get_clock_telapsed(start, end);
-
-    //int show = n < 5? n : 5;
-    //fprintf(stderr, "[main:gen_truth::*] diag(S)[0..%d] = ", show-1);
-    //for (int i = 0; i < show; ++i) fprintf(stderr, "%.3e,", S[i]);
-    //fprintf(stderr, "%s\n", n < 5? "" : "...");
-
-    //fprintf(stderr, "[main:gen_truth::%.5f(s)] err=%.18e (DLATMS-vs-DGESVD) [S :: singular values]\n", gentime, l2dist(S, Scheck, n));
-    //free(Scheck);
 
     //double *Up = malloc(m*p*sizeof(double));
     //double *Sp = malloc(p*sizeof(double));
